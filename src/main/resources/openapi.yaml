@@ -3,55 +3,7 @@ openapi: 3.0.3
 info:
   title: Veritae Auth & Member API
   version: 0.1.0
-  description: |
-    Veritae 플랫폼의 인증(회원가입/로그인/토큰 갱신) 및 회원 정보 조회 API.
-
-    이 스펙은 이 기능(로그인/회원가입 + 내 정보 조회)에 대한 **최초의 공식 요구사항 산출물**이며,
-    별도 PRD가 없으므로 아래 인수 조건(Acceptance Criteria)이 계약의 기준이 된다.
-    스펙 범위는 이번 주 작업으로 한정한다: 비밀번호 변경 / 로그아웃 / 회원 탈퇴 / 소셜 로그인은
-    **의도적으로 제외**한다.
-
-    ## Scope (이번 스펙에 포함되는 엔드포인트 — 4개, 그 이상도 이하도 아님)
-    - `POST /api/v1/auth/signup`   — 회원가입
-    - `POST /api/v1/auth/login`    — 로그인 (JWT 발급)
-    - `POST /api/v1/auth/refresh`  — 액세스 토큰 갱신
-    - `GET  /api/v1/members/me`    — 내 정보 조회 (인증 필요)
-
-    ## 인증 모델
-    - JWT 기반, **stateless**. 서버 측 세션/토큰 저장소 없음.
-    - 액세스 토큰은 짧은 수명(30분)으로 발급하며, 이것이 서버측 토큰 무효화(로그아웃) 부재에 대한 완화책이다.
-    - 토큰 무효화(로그아웃) 엔드포인트는 이번 범위에 **없다**. 추가하지 말 것.
-    - 보호 엔드포인트는 `Authorization: Bearer <accessToken>` 헤더를 요구한다.
-
-    ## 에러 포맷
-    - 모든 4xx 에러는 RFC 9457 Problem Details(`application/problem+json`) 로 반환한다.
-    - 공통 `ProblemDetail` 스키마를 재사용하며 `errorCode`(기계 판독용), `timestamp` 확장 필드를 포함한다.
-    - 입력 검증 실패(400)는 `violations` 배열로 필드별 오류를 제공한다.
-
-    ## Acceptance Criteria (PRD-lite)
-
-    ### AC-1 회원가입 `POST /api/v1/auth/signup`
-    - 요청: email(이메일 형식, 필수), password(8~20자, 영문+숫자 각 1자 이상, 필수),
-      nickname(2~10자, 유니코드 문자/숫자, 필수).
-    - 성공 시 `201 Created` 로 생성된 회원의 id/email/nickname 반환. **비밀번호는 절대 응답에 포함하지 않는다.**
-    - 입력값 검증 실패 시 `400`, 이미 가입된 이메일이면 `409` 반환.
-    - 비밀번호는 서버에서 단방향 해시로 저장한다(예: BCrypt). 평문 저장 금지.
-
-    ### AC-2 로그인 `POST /api/v1/auth/login`
-    - 요청: email, password.
-    - 성공 시 `200 OK` 로 accessToken + refreshToken(JWT) 및 tokenType, expiresIn(초) 반환.
-    - 이메일 미존재/비밀번호 불일치는 구분하지 않고 동일하게 `401` 반환(계정 열거 방지).
-
-    ### AC-3 토큰 갱신 `POST /api/v1/auth/refresh`
-    - 요청: refreshToken.
-    - 성공 시 `200 OK` 로 **새 accessToken**(+ tokenType, expiresIn) 반환.
-    - refreshToken 이 유효하지 않거나 만료되면 `401` 반환.
-    - 이번 범위에서 refreshToken 회전(rotation)은 하지 않는다: 기존 refreshToken 은 그대로 재사용한다.
-
-    ### AC-4 내 정보 조회 `GET /api/v1/members/me`
-    - `Authorization: Bearer <accessToken>` 필수.
-    - 성공 시 `200 OK` 로 인증된 회원 본인의 id/email/nickname 반환.
-    - 토큰 누락/무효/만료 시 `401` 반환. 읽기 전용이며 수정/삭제 엔드포인트는 이번 범위에 없다.
+  description: Veritae 인증(회원가입/로그인/토큰 갱신) 및 회원 정보 조회 API.
 
 servers:
   - url: http://localhost:8080

@@ -89,7 +89,13 @@ ADR-0001 은 API 계약(엔드포인트/에러 포맷/인증 모델)을 확정�
   오버라이드해 모든 에러 응답에 두 필드를 보정하도록 수정.
 - **M2 (동시 가입 레이스):** `MemberService.signup` 의 `existsByEmail` → `save` 사이 TOCTOU 로,
   동시 요청 시 DB 유니크 제약 위반이 500 으로 새던 것을 `DataIntegrityViolationException` 을 잡아
-  `EmailAlreadyExistsException`(409)으로 변환하도록 수정.
+  `EmailAlreadyExistsException`(409)으로 변환하도록 수정. **실제로 curl 로 동시 요청 2개를 붙여
+  재현하며 검증하는 과정에서, 최초 수정(`save()` 그대로 두고 try/catch 만 추가)은 실제로는 안 먹힌다는
+  것이 드러났다** — UUID 는 Java 에서 미리 생성되므로 Hibernate 가 ID 확보를 위해 flush 를 강제할
+  이유가 없고, 그래서 평범한 `save()` 는 실제 INSERT 를 트랜잭션 커밋 시점까지 지연시킨다. 그 결과
+  유니크 제약 위반이 이 메서드가 반환된 "이후"(커밋 중, try/catch 밖)에 던져져 잡히지 않았다.
+  `memberRepository.saveAndFlush(member)` 로 바꿔 INSERT 를 즉시 실행시키도록 수정한 뒤에야
+  동시 요청 재현에서 201/409 로 정상 분기됨을 확인했다.
 - **M3 (JWT 시크릿 하드코딩):** 위 "JWT 시크릿/서명키 관리" 절 참조.
 - **m1 (로그인 타이밍 사이드채널):** "이메일 미존재" 시 BCrypt 비교를 건너뛰어 응답 시간으로 계정
   존재 여부가 새던 것을, 고정 더미 해시(`AuthService.DUMMY_PASSWORD_HASH`)와 항상 비교하도록 수정해
@@ -97,6 +103,28 @@ ADR-0001 은 API 계약(엔드포인트/에러 포맷/인증 모델)을 확정�
 
 각 항목에 회귀 테스트를 추가했다(`MemberServiceTest`, `AuthApiControllerTest`, `JwtTokenProviderTest`,
 `AuthServiceTest`).
+
+## Swagger UI 가 요청 스키마를 깨뜨리는 문제 (실기동 검증 중 발견, 2026-07-17)
+
+브라우저로 Swagger UI 를 직접 열어 확인하는 과정에서, `signup` 등 요청 바디가 필요한 엔드포인트의
+입력 폼이 예시도 없이 그냥 문자열 입력창으로 깨져 나오는 것을 발견했다. 실제 API 자체는(`curl` 로
+직접 검증) 정상이었고, 문제는 springdoc 이 컨트롤러를 스캔해 런타임에 재생성하는 `/v3/api-docs` 에만
+있었다.
+
+- **원인**: 이 프로젝트는 Spring Boot 4(Jackson 3, `tools.jackson.*`)를 쓰는데, Swagger 문서 생성을
+  담당하는 `swagger-core-jakarta`(springdoc 의 의존성)는 아직 Jackson 2(`com.fasterxml.jackson.databind`)
+  기반 `ModelResolver` 로 스키마를 조립한다. 두 Jackson 스택이 한 클래스패스에 공존하면서, 런타임
+  생성된 `/v3/api-docs` 의 요청 스키마가 `{"type":"string"}` 으로, 응답 스키마도 `$ref` 옆에
+  `additionalProperties`/`default` 가 잘못 섞여 나오는 등 깨진 형태로 직렬화됐다.
+- **시도했다가 폐기한 방법**: `springdoc.api-docs.enabled=false` 로 아예 껐더니 Swagger UI 자체가
+  통째로 사라졌다(swagger-ui 자동설정이 api-docs 활성화에 묶여 있음, 실측 확인). 이 프로퍼티는 쓰지 않는다.
+- **채택한 해결책**: 이 프로젝트는 애초에 openapi-first(ADR-0001) 라 손으로 작성한
+  `src/main/resources/openapi.yaml` 이 유일한 진실 공급원이다. springdoc 의 런타임 재생성 결과를
+  신뢰하는 대신, `OpenApiStaticSpecConfig`(`WebMvcConfigurer`)로 이 정적 파일을 `/openapi.yaml` 경로에
+  그대로 노출하고, `springdoc.swagger-ui.url=/openapi.yaml` 로 Swagger UI 가 그 파일을 직접 읽게
+  고정했다. `/v3/api-docs` 자체는 그대로 살아있지만(비활성화하면 UI 가 꺼지므로) Swagger UI 는 더 이상
+  참조하지 않는다.
+- `SecurityConfig` 의 `SWAGGER_PATHS` 에 `/openapi.yaml` 을 추가해 인증 없이 접근 가능하게 했다.
 
 ## 호환성 분류
 

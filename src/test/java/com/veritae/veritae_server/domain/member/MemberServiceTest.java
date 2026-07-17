@@ -37,7 +37,7 @@ class MemberServiceTest {
         // Given
         when(memberRepository.existsByEmail("user@veritae.app")).thenReturn(false);
         when(passwordEncoder.encode("veritae123")).thenReturn("encoded-hash");
-        when(memberRepository.save(any(Member.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(memberRepository.saveAndFlush(any(Member.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         // When
         Member result = memberService.signup("user@veritae.app", "veritae123", "진실이");
@@ -47,7 +47,7 @@ class MemberServiceTest {
         assertThat(result.getPasswordHash()).isEqualTo("encoded-hash");
         assertThat(result.getNickname()).isEqualTo("진실이");
         assertThat(result.getId()).isNotNull();
-        verify(memberRepository).save(any(Member.class));
+        verify(memberRepository).saveAndFlush(any(Member.class));
     }
 
     @Test
@@ -58,7 +58,7 @@ class MemberServiceTest {
         // When / Then
         assertThatThrownBy(() -> memberService.signup("user@veritae.app", "veritae123", "진실이"))
                 .isInstanceOf(EmailAlreadyExistsException.class);
-        verify(memberRepository, org.mockito.Mockito.never()).save(any(Member.class));
+        verify(memberRepository, org.mockito.Mockito.never()).saveAndFlush(any(Member.class));
     }
 
     @Test
@@ -67,7 +67,7 @@ class MemberServiceTest {
         // DB 유니크 제약(idx_members_email) 위반으로 실패하는 TOCTOU 상황을 재현한다.
         when(memberRepository.existsByEmail("user@veritae.app")).thenReturn(false);
         when(passwordEncoder.encode("veritae123")).thenReturn("encoded-hash");
-        when(memberRepository.save(any(Member.class)))
+        when(memberRepository.saveAndFlush(any(Member.class)))
                 .thenThrow(new DataIntegrityViolationException("duplicate key"));
 
         // When / Then
