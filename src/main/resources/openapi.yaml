@@ -171,7 +171,7 @@ components:
       type: http
       scheme: bearer
       bearerFormat: JWT
-      description: JWT 액세스 토큰. `Authorization: Bearer <accessToken>` 헤더로 전달한다.
+      description: "JWT 액세스 토큰. `Authorization: Bearer <accessToken>` 헤더로 전달한다."
 
   schemas:
     SignupRequest:

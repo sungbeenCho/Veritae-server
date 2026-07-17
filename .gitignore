@@ -5,6 +5,10 @@ build/
 !**/src/main/**/build/
 !**/src/test/**/build/
 
+### openapi-generator ###
+# build/ 는 이미 위에서 무시되지만, 생성 경로를 명시적으로 남겨 향후 outputDir 변경 시에도 실수로 커밋되지 않게 한다.
+build/generated/openapi/
+
 ### STS ###
 .apt_generated
 .classpath

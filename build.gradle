@@ -2,6 +2,7 @@ plugins {
 	id 'java'
 	id 'org.springframework.boot' version '4.0.6'
 	id 'io.spring.dependency-management' version '1.1.7'
+	id 'org.openapi.generator' version '7.23.0'
 }
 
 group = 'com.veritae'
@@ -17,11 +18,27 @@ repositories {
 	mavenCentral()
 }
 
+ext {
+	generatedOpenApiDir = layout.buildDirectory.dir("generated/openapi")
+}
+
 dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
 	implementation 'org.springframework.boot:spring-boot-starter-security'
 	implementation 'org.springframework.boot:spring-boot-starter-validation'
 	implementation 'org.springframework.boot:spring-boot-starter-webmvc'
+
+	// API 문서화(Swagger UI) - 수동 테스트용. Spring Boot 4 / Spring 7 대응 3.x 라인.
+	implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:3.0.3'
+	// openapi-generator(spring, useSpringBoot4) 로 생성되는 모델의 @Schema 어노테이션에 필요.
+	implementation 'io.swagger.core.v3:swagger-annotations-jakarta:2.2.52'
+
+	// JWT 발급/검증 (stateless access/refresh 토큰).
+	implementation 'io.jsonwebtoken:jjwt-api:0.13.0'
+	runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.13.0'
+	// Boot 4 기본 JSON 스택(Jackson 3, tools.jackson)과 별개로 유지하기 위해 gson 구현체 사용.
+	runtimeOnly 'io.jsonwebtoken:jjwt-gson:0.13.0'
+
 	compileOnly 'org.projectlombok:lombok'
 	runtimeOnly 'com.mysql:mysql-connector-j'
 	annotationProcessor 'org.projectlombok:lombok'
@@ -36,4 +53,52 @@ dependencies {
 
 tasks.named('test') {
 	useJUnitPlatform()
+}
+
+// --- openapi-generator: openapi.yaml 로부터 AuthApi/MembersApi 인터페이스 + DTO 생성 (delegate 패턴) ---
+openApiGenerate {
+	generatorName.set("spring")
+	inputSpec.set(layout.projectDirectory.file("src/main/resources/openapi.yaml"))
+	outputDir.set(generatedOpenApiDir)
+	apiPackage.set("com.veritae.veritae_server.openapi.api")
+	modelPackage.set("com.veritae.veritae_server.openapi.model")
+	invokerPackage.set("com.veritae.veritae_server.openapi")
+	configOptions.set([
+		delegatePattern     : "true",
+		interfaceOnly       : "false",
+		useSpringBoot4      : "true",  // Spring Boot 4.x 대상 (jakarta 네임스페이스 포함)
+		useJackson3         : "true",  // Boot 4 기본 JSON 스택(Jackson 3)과 맞춤
+		useTags             : "true",
+		dateLibrary         : "java8",
+		openApiNullable     : "false",
+		// NOTE: true 로 두면 생성된 XxxApiController 의 널세이프 폴백(`new XxxApiDelegate() {}`)이
+		// default 본문 없는 추상 메서드를 구현하지 못해 컴파일이 깨진다(openapi-generator 7.23.0 +
+		// useSpringBoot4 조합에서 실측 확인). delegate 빈이 없을 때는 컴파일 타임이 아니라
+		// 런타임에 501 Not Implemented 로 드러난다 — 우리는 AuthApiDelegateImpl/MembersApiDelegateImpl
+		// 을 항상 @Service 로 등록하므로 실질적 영향은 없다.
+		skipDefaultInterface: "false"
+	])
+	generateApiTests.set(false)
+	generateModelTests.set(false)
+	generateApiDocumentation.set(false)
+	generateModelDocumentation.set(false)
+	// NOTE: .openapi-generator-ignore / ignoreFileOverride 는 "재생성 시 기존 파일을 덮어쓰지 않는다"는
+	// 의미이지, "처음부터 생성하지 않는다"는 의미가 아니다 — 매 빌드마다 output 디렉터리를 새로 만드는
+	// 우리 방식(clean build)에는 효과가 없어 실측 후 폐기했다. 대신 아래 sourceSets 의 exclude 로 컴파일
+	// 대상에서 제외한다(Application/HomeController/SpringDocConfiguration/ApiUtil 은 우리 자체
+	// VeritaeServerApplication + springdoc 설정과 중복되고 실제로 참조되지 않는다 - 실측 확인).
+}
+
+sourceSets {
+	main {
+		java {
+			srcDir generatedOpenApiDir.map { it.dir("src/main/java") }
+			exclude "com/veritae/veritae_server/openapi/OpenApiGeneratorApplication.java"
+			exclude "org/openapitools/configuration/**"
+		}
+	}
+}
+
+tasks.named('compileJava') {
+	dependsOn tasks.named('openApiGenerate')
 }
