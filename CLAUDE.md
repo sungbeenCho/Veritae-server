@@ -6,12 +6,8 @@ AI 기반 디지털 사기 예방 및 콘텐츠 신뢰도 분석 플랫폼
 - iOS 개발: 팀장(형) — https://github.com/IMCHO/Veritae-iOS
 - 서버(Spring Boot): 나 (사용자)
 
-## 기술 스택
-- Java 21 (Microsoft OpenJDK 21), JAVA_HOME 수동 설정 완료
-- Spring Boot 4.0.6 + Gradle
-- MySQL 8.0 (DB명: `veritae`) — 실사용 DB
-- PostgreSQL 16도 설치되어 있으나 미사용 (설치만 됨)
-- IntelliJ IDEA, Windows 11, PowerShell
+## 환경 메모
+- JAVA_HOME 수동 설정 완료 (빌드 실패 시 이것부터 의심하지 말 것)
 
 ## 레포
 - 서버: https://github.com/sungbeenCho/Veritae-server (main 브랜치)
