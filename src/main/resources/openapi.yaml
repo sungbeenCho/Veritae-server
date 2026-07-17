@@ -1,0 +1,464 @@
+openapi: 3.0.3
+
+info:
+  title: Veritae Auth & Member API
+  version: 0.1.0
+  description: |
+    Veritae 플랫폼의 인증(회원가입/로그인/토큰 갱신) 및 회원 정보 조회 API.
+
+    이 스펙은 이 기능(로그인/회원가입 + 내 정보 조회)에 대한 **최초의 공식 요구사항 산출물**이며,
+    별도 PRD가 없으므로 아래 인수 조건(Acceptance Criteria)이 계약의 기준이 된다.
+    스펙 범위는 이번 주 작업으로 한정한다: 비밀번호 변경 / 로그아웃 / 회원 탈퇴 / 소셜 로그인은
+    **의도적으로 제외**한다.
+
+    ## Scope (이번 스펙에 포함되는 엔드포인트 — 4개, 그 이상도 이하도 아님)
+    - `POST /api/v1/auth/signup`   — 회원가입
+    - `POST /api/v1/auth/login`    — 로그인 (JWT 발급)
+    - `POST /api/v1/auth/refresh`  — 액세스 토큰 갱신
+    - `GET  /api/v1/members/me`    — 내 정보 조회 (인증 필요)
+
+    ## 인증 모델
+    - JWT 기반, **stateless**. 서버 측 세션/토큰 저장소 없음.
+    - 액세스 토큰은 짧은 수명(30분)으로 발급하며, 이것이 서버측 토큰 무효화(로그아웃) 부재에 대한 완화책이다.
+    - 토큰 무효화(로그아웃) 엔드포인트는 이번 범위에 **없다**. 추가하지 말 것.
+    - 보호 엔드포인트는 `Authorization: Bearer <accessToken>` 헤더를 요구한다.
+
+    ## 에러 포맷
+    - 모든 4xx 에러는 RFC 9457 Problem Details(`application/problem+json`) 로 반환한다.
+    - 공통 `ProblemDetail` 스키마를 재사용하며 `errorCode`(기계 판독용), `timestamp` 확장 필드를 포함한다.
+    - 입력 검증 실패(400)는 `violations` 배열로 필드별 오류를 제공한다.
+
+    ## Acceptance Criteria (PRD-lite)
+
+    ### AC-1 회원가입 `POST /api/v1/auth/signup`
+    - 요청: email(이메일 형식, 필수), password(8~20자, 영문+숫자 각 1자 이상, 필수),
+      nickname(2~10자, 유니코드 문자/숫자, 필수).
+    - 성공 시 `201 Created` 로 생성된 회원의 id/email/nickname 반환. **비밀번호는 절대 응답에 포함하지 않는다.**
+    - 입력값 검증 실패 시 `400`, 이미 가입된 이메일이면 `409` 반환.
+    - 비밀번호는 서버에서 단방향 해시로 저장한다(예: BCrypt). 평문 저장 금지.
+
+    ### AC-2 로그인 `POST /api/v1/auth/login`
+    - 요청: email, password.
+    - 성공 시 `200 OK` 로 accessToken + refreshToken(JWT) 및 tokenType, expiresIn(초) 반환.
+    - 이메일 미존재/비밀번호 불일치는 구분하지 않고 동일하게 `401` 반환(계정 열거 방지).
+
+    ### AC-3 토큰 갱신 `POST /api/v1/auth/refresh`
+    - 요청: refreshToken.
+    - 성공 시 `200 OK` 로 **새 accessToken**(+ tokenType, expiresIn) 반환.
+    - refreshToken 이 유효하지 않거나 만료되면 `401` 반환.
+    - 이번 범위에서 refreshToken 회전(rotation)은 하지 않는다: 기존 refreshToken 은 그대로 재사용한다.
+
+    ### AC-4 내 정보 조회 `GET /api/v1/members/me`
+    - `Authorization: Bearer <accessToken>` 필수.
+    - 성공 시 `200 OK` 로 인증된 회원 본인의 id/email/nickname 반환.
+    - 토큰 누락/무효/만료 시 `401` 반환. 읽기 전용이며 수정/삭제 엔드포인트는 이번 범위에 없다.
+
+servers:
+  - url: http://localhost:8080
+    description: 로컬 개발 서버
+
+tags:
+  - name: Auth
+    description: 회원가입, 로그인, 토큰 갱신
+  - name: Members
+    description: 회원 정보 조회
+
+paths:
+  /api/v1/auth/signup:
+    post:
+      tags: [Auth]
+      operationId: signup
+      summary: 회원가입
+      description: 이메일/비밀번호/닉네임으로 신규 회원을 생성한다. 비밀번호는 응답에 포함되지 않는다.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SignupRequest'
+      responses:
+        '201':
+          description: 회원 생성 성공
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MemberResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '409':
+          $ref: '#/components/responses/EmailConflict'
+        default:
+          $ref: '#/components/responses/ServerError'
+
+  /api/v1/auth/login:
+    post:
+      tags: [Auth]
+      operationId: login
+      summary: 로그인
+      description: 자격 증명 검증 후 access/refresh 토큰(JWT)을 발급한다.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: 로그인 성공, 토큰 발급
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/InvalidCredentials'
+        default:
+          $ref: '#/components/responses/ServerError'
+
+  /api/v1/auth/refresh:
+    post:
+      tags: [Auth]
+      operationId: refreshToken
+      summary: 액세스 토큰 갱신
+      description: 유효한 refreshToken 으로 새 accessToken 을 발급한다. refreshToken 은 회전하지 않는다.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshRequest'
+      responses:
+        '200':
+          description: 새 액세스 토큰 발급
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccessTokenResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/InvalidRefreshToken'
+        default:
+          $ref: '#/components/responses/ServerError'
+
+  /api/v1/members/me:
+    get:
+      tags: [Members]
+      operationId: getMyProfile
+      summary: 내 정보 조회
+      description: Bearer 액세스 토큰으로 인증된 회원 본인의 정보를 반환한다.
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: 내 정보 조회 성공
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MemberResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        default:
+          $ref: '#/components/responses/ServerError'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT 액세스 토큰. `Authorization: Bearer <accessToken>` 헤더로 전달한다.
+
+  schemas:
+    SignupRequest:
+      type: object
+      required: [email, password, nickname]
+      properties:
+        email:
+          type: string
+          format: email
+          nullable: false
+          maxLength: 254
+          description: 로그인 식별자로 사용되는 이메일. 시스템 내 유일해야 한다.
+          example: user@veritae.app
+        password:
+          type: string
+          format: password
+          nullable: false
+          minLength: 8
+          maxLength: 20
+          pattern: '^(?=.*[A-Za-z])(?=.*\d).{8,20}$'
+          description: 8~20자, 영문자와 숫자를 각각 1자 이상 포함. 응답에는 절대 포함되지 않는다.
+          example: veritae123
+        nickname:
+          type: string
+          nullable: false
+          minLength: 2
+          maxLength: 10
+          pattern: '^[\p{L}\p{N}]{2,10}$'
+          description: 2~10자, 유니코드 문자/숫자(한글 허용), 공백·특수문자 불가.
+          example: 진실이
+
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+          nullable: false
+          maxLength: 254
+          example: user@veritae.app
+        password:
+          type: string
+          format: password
+          nullable: false
+          minLength: 1
+          maxLength: 20
+          description: 로그인 시에는 형식 검증만 최소로 수행한다(실제 판정은 자격 증명 검증에서).
+          example: veritae123
+
+    RefreshRequest:
+      type: object
+      required: [refreshToken]
+      properties:
+        refreshToken:
+          type: string
+          nullable: false
+          minLength: 1
+          description: 로그인 시 발급받은 refresh 토큰(JWT).
+          example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+
+    TokenResponse:
+      type: object
+      required: [accessToken, refreshToken, tokenType, expiresIn]
+      properties:
+        accessToken:
+          type: string
+          nullable: false
+          description: 보호 API 호출에 사용하는 단기 JWT.
+          example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+        refreshToken:
+          type: string
+          nullable: false
+          description: accessToken 갱신에 사용하는 장기 JWT.
+          example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+        tokenType:
+          type: string
+          nullable: false
+          enum: [Bearer]
+          description: 토큰 타입. 항상 "Bearer".
+          example: Bearer
+        expiresIn:
+          type: integer
+          format: int64
+          nullable: false
+          minimum: 1
+          description: accessToken 만료까지 남은 시간(초). 기본 1800초(30분).
+          example: 1800
+
+    AccessTokenResponse:
+      type: object
+      required: [accessToken, tokenType, expiresIn]
+      properties:
+        accessToken:
+          type: string
+          nullable: false
+          description: 새로 발급된 단기 JWT.
+          example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+        tokenType:
+          type: string
+          nullable: false
+          enum: [Bearer]
+          example: Bearer
+        expiresIn:
+          type: integer
+          format: int64
+          nullable: false
+          minimum: 1
+          description: accessToken 만료까지 남은 시간(초). 기본 1800초(30분).
+          example: 1800
+
+    MemberResponse:
+      type: object
+      required: [id, email, nickname]
+      properties:
+        id:
+          type: string
+          format: uuid
+          nullable: false
+          description: 회원의 공개 식별자(UUID). 순차 증가 PK 를 외부에 노출하지 않는다.
+          example: 3f2504e0-4f89-41d3-9a0c-0305e82c3301
+        email:
+          type: string
+          format: email
+          nullable: false
+          example: user@veritae.app
+        nickname:
+          type: string
+          nullable: false
+          example: 진실이
+
+    ProblemDetail:
+      type: object
+      description: RFC 9457 Problem Details. 모든 4xx 에러 공통 스키마.
+      required: [type, title, status, errorCode]
+      properties:
+        type:
+          type: string
+          format: uri
+          nullable: false
+          description: 에러 유형 식별 URI.
+          example: https://api.veritae.app/errors/email-already-exists
+        title:
+          type: string
+          nullable: false
+          description: 에러 유형의 사람이 읽을 수 있는 요약.
+          example: Email Already Exists
+        status:
+          type: integer
+          format: int32
+          nullable: false
+          description: HTTP 상태 코드.
+          example: 409
+        detail:
+          type: string
+          nullable: true
+          description: 이 발생 건에 대한 상세 설명.
+          example: 이미 가입된 이메일입니다.
+        instance:
+          type: string
+          format: uri
+          nullable: true
+          description: 문제가 발생한 요청 경로.
+          example: /api/v1/auth/signup
+        errorCode:
+          type: string
+          nullable: false
+          description: 기계 판독용 에러 코드(클라이언트 분기용).
+          example: EMAIL_ALREADY_EXISTS
+        timestamp:
+          type: string
+          format: date-time
+          nullable: true
+          description: 에러 발생 시각(ISO 8601).
+          example: '2026-07-17T09:00:00Z'
+        violations:
+          type: array
+          nullable: true
+          description: 입력 검증 실패(400)일 때 필드별 오류 목록. 그 외에는 생략/null.
+          items:
+            $ref: '#/components/schemas/Violation'
+
+    Violation:
+      type: object
+      required: [field, message]
+      properties:
+        field:
+          type: string
+          nullable: false
+          description: 검증에 실패한 요청 필드명.
+          example: password
+        message:
+          type: string
+          nullable: false
+          description: 필드 오류 메시지.
+          example: 8~20자, 영문자와 숫자를 각각 1자 이상 포함해야 합니다.
+
+  responses:
+    ValidationError:
+      description: 입력값 검증 실패
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetail'
+          example:
+            type: https://api.veritae.app/errors/validation
+            title: Validation Failed
+            status: 400
+            detail: 요청 값 검증에 실패했습니다.
+            instance: /api/v1/auth/signup
+            errorCode: VALIDATION_FAILED
+            timestamp: '2026-07-17T09:00:00Z'
+            violations:
+              - field: password
+                message: 8~20자, 영문자와 숫자를 각각 1자 이상 포함해야 합니다.
+
+    EmailConflict:
+      description: 이미 가입된 이메일
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetail'
+          example:
+            type: https://api.veritae.app/errors/email-already-exists
+            title: Email Already Exists
+            status: 409
+            detail: 이미 가입된 이메일입니다.
+            instance: /api/v1/auth/signup
+            errorCode: EMAIL_ALREADY_EXISTS
+            timestamp: '2026-07-17T09:00:00Z'
+
+    InvalidCredentials:
+      description: 이메일 또는 비밀번호 불일치(구분하지 않음)
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetail'
+          example:
+            type: https://api.veritae.app/errors/invalid-credentials
+            title: Invalid Credentials
+            status: 401
+            detail: 이메일 또는 비밀번호가 올바르지 않습니다.
+            instance: /api/v1/auth/login
+            errorCode: INVALID_CREDENTIALS
+            timestamp: '2026-07-17T09:00:00Z'
+
+    InvalidRefreshToken:
+      description: refreshToken 이 유효하지 않거나 만료됨
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetail'
+          example:
+            type: https://api.veritae.app/errors/invalid-refresh-token
+            title: Invalid Refresh Token
+            status: 401
+            detail: refresh 토큰이 유효하지 않거나 만료되었습니다.
+            instance: /api/v1/auth/refresh
+            errorCode: INVALID_REFRESH_TOKEN
+            timestamp: '2026-07-17T09:00:00Z'
+
+    Unauthorized:
+      description: 인증 실패(액세스 토큰 누락/무효/만료)
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetail'
+          example:
+            type: https://api.veritae.app/errors/unauthorized
+            title: Unauthorized
+            status: 401
+            detail: 인증이 필요합니다.
+            instance: /api/v1/members/me
+            errorCode: UNAUTHORIZED
+            timestamp: '2026-07-17T09:00:00Z'
+
+    ServerError:
+      description: 예상하지 못한 서버 오류(예 400/401/409 외 나머지 모든 상태코드)
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetail'
+          example:
+            type: https://api.veritae.app/errors/internal-server-error
+            title: Internal Server Error
+            status: 500
+            detail: 서버에서 예상하지 못한 오류가 발생했습니다.
+            instance: /api/v1/auth/login
+            errorCode: INTERNAL_SERVER_ERROR
+            timestamp: '2026-07-17T09:00:00Z'
