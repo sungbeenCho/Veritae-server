@@ -20,6 +20,13 @@ public abstract class DomainException extends RuntimeException {
         this.title = title;
     }
 
+    protected DomainException(String errorCode, HttpStatus httpStatus, String title, String message, Throwable cause) {
+        super(message, cause);
+        this.errorCode = errorCode;
+        this.httpStatus = httpStatus;
+        this.title = title;
+    }
+
     public String getErrorCode() {
         return errorCode;
     }

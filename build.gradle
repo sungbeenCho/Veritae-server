@@ -39,6 +39,11 @@ dependencies {
 	// Boot 4 기본 JSON 스택(Jackson 3, tools.jackson)과 별개로 유지하기 위해 gson 구현체 사용.
 	runtimeOnly 'io.jsonwebtoken:jjwt-gson:0.13.0'
 
+	// RestClient 로 멀티파트(MultipartBodyBuilder) 바디를 보낼 때 AllEncompassingFormHttpMessageConverter 가
+	// org.reactivestreams.Publisher 를 클래스 로딩 시점에 참조한다(WebFlux 없이도) - 실측 시
+	// NoClassDefFoundError 로 확인. 리액티브 스택 전체 대신 이 인터페이스 전용 초경량 jar만 추가.
+	runtimeOnly 'org.reactivestreams:reactive-streams'
+
 	compileOnly 'org.projectlombok:lombok'
 	runtimeOnly 'com.mysql:mysql-connector-j'
 	annotationProcessor 'org.projectlombok:lombok'
