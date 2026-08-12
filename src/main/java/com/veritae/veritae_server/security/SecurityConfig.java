@@ -40,6 +40,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/auth/**").permitAll()
                         .requestMatchers(SWAGGER_PATHS).permitAll()
                         .requestMatchers("/api/v1/members/**").authenticated()
+                        .requestMatchers("/api/v1/analysis/**").authenticated()
                         .anyRequest().authenticated())
                 .exceptionHandling(ex -> ex.authenticationEntryPoint(problemDetailAuthenticationEntryPoint))
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
