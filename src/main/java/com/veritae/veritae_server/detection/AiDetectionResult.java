@@ -1,4 +1,6 @@
 package com.veritae.veritae_server.detection;
 
-public record AiDetectionResult(String model, double score) {
+import java.util.List;
+
+public record AiDetectionResult(String model, double score, List<Evidence> evidence) {
 }

@@ -8,6 +8,8 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockMultipartFile;
 
+import java.util.List;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -31,7 +33,7 @@ class ImageAnalysisServiceTest {
         // Given
         var file = new MockMultipartFile("file", "test.jpg", "image/jpeg", "fake-bytes".getBytes());
         when(detectionClient.detectImage(file.getBytes(), "test.jpg", "image/jpeg"))
-                .thenReturn(new AiDetectionResult("spai", 0.87));
+                .thenReturn(new AiDetectionResult("spai", 0.87, List.of()));
 
         // When
         AiDetectionResult result = imageAnalysisService.analyzeImage(file);
