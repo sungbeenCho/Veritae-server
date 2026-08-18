@@ -1,8 +1,10 @@
 package com.veritae.veritae_server.api;
 
+import com.veritae.veritae_server.analysis.AudioAnalysisService;
 import com.veritae.veritae_server.analysis.ImageAnalysisService;
 import com.veritae.veritae_server.auth.jwt.JwtTokenProvider;
 import com.veritae.veritae_server.detection.AiDetectionResult;
+import com.veritae.veritae_server.detection.Evidence;
 import com.veritae.veritae_server.openapi.api.AnalysisApiController;
 import com.veritae.veritae_server.security.ProblemDetailAuthenticationEntryPoint;
 import com.veritae.veritae_server.security.SecurityConfig;
@@ -32,6 +34,9 @@ class AnalysisApiControllerTest {
 
     @MockitoBean
     private ImageAnalysisService imageAnalysisService;
+
+    @MockitoBean
+    private AudioAnalysisService audioAnalysisService;
 
     // JwtAuthenticationFilter 는 @Component(Filter) 라 @WebMvcTest 슬라이스에도 자동 등록되므로,
     // 그 의존성인 JwtTokenProvider 를 만족시켜야 컨텍스트가 뜬다.
@@ -72,6 +77,32 @@ class AnalysisApiControllerTest {
         var file = new MockMultipartFile("file", "test.jpg", "image/jpeg", "fake-bytes".getBytes());
 
         mockMvc.perform(multipart("/api/v1/analysis/image").file(file))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @WithMockUser
+    void analyzeAudio_withAuthenticatedMemberAndValidFile_shouldReturn200WithScoreAndEvidence() throws Exception {
+        var file = new MockMultipartFile("file", "test.wav", "audio/wav", "fake-bytes".getBytes());
+        when(audioAnalysisService.analyzeAudio(any())).thenReturn(new AiDetectionResult(
+                "antideepfake", 0.87,
+                List.of(new Evidence(
+                        "시간 구간 이상 패턴", "0.5초~1.2초 구간에서 합성 흔적이 감지됨",
+                        List.of("temporal"), 0.5, 1.2))));
+
+        mockMvc.perform(multipart("/api/v1/analysis/audio").file(file))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.aiDetection.model").value("antideepfake"))
+                .andExpect(jsonPath("$.aiDetection.score").value(0.87))
+                .andExpect(jsonPath("$.aiDetection.evidence[0].title").value("시간 구간 이상 패턴"))
+                .andExpect(jsonPath("$.aiDetection.evidence[0].startSec").value(0.5));
+    }
+
+    @Test
+    void analyzeAudio_withoutAuthentication_shouldReturn401() throws Exception {
+        var file = new MockMultipartFile("file", "test.wav", "audio/wav", "fake-bytes".getBytes());
+
+        mockMvc.perform(multipart("/api/v1/analysis/audio").file(file))
                 .andExpect(status().isUnauthorized());
     }
 }
