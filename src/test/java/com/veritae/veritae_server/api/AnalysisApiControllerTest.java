@@ -50,8 +50,13 @@ class AnalysisApiControllerTest {
 
     @Test
     @WithMockUser
-    void analyzeImage_withFileLargerThanSpringDefaultMultipartLimit_shouldNotBeRejectedByFramework()
+    void analyzeImage_withFileLargerThanSpringDefaultMultipartLimit_shouldProcessSuccessfully()
             throws Exception {
+        // MockMvc는 실제 서블릿 컨테이너의 멀티파트 처리를 거치지 않으므로,
+        // 이 테스트는 5MB 파일이 MockMvc 레벨에서 정상 처리됨을 확인할 뿐
+        // 프레임워크의 spring.servlet.multipart.max-file-size 설정이 실제로 작동함을 검증하지는 않는다.
+        // 설정값 자체(max-file-size=30MB, max-request-size=30MB)는 코드 리뷰로 검증된다.
+        // 운영 환경에서 실제 HTTP 요청 시에는 서블릿 컨테이너가 이 설정을 적용한다.
         byte[] largeContent = new byte[5 * 1024 * 1024]; // 5MB > Spring Boot 기본 max-file-size(1MB)
         var file = new MockMultipartFile("file", "test.jpg", "image/jpeg", largeContent);
         when(imageAnalysisService.analyzeImage(any())).thenReturn(new AiDetectionResult("spai", 0.87));
