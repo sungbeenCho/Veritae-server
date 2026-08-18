@@ -16,17 +16,18 @@
 
 형의 기술검토(`deepfake-engine-review.md` §3, §7)에 따라:
 - **음성**: [AntiDeepfake](https://github.com/nii-yamagishilab/AntiDeepfake) (nii-yamagishilab) — 코드 BSD-3, 가중치 CC BY-NC-SA(비상업 전용). 이 프로젝트는 유료화 계획이 없어(2026-08-18 확인) 라이선스 문제 없음. 100+ 언어(한국어 포함) 학습, 활발히 유지보수됨.
-- 아키텍처: wav2vec2/XLS-R SSL 프론트엔드 + AASIST 스타일 그래프 어텐션 헤드(`models/aasist/AASIST.py`)
+- **체크포인트**: `mms_300m` (README의 "Try it out" 데모가 안내하는 플래그십 체크포인트, 형 문서가 평가한 "최고 일반화 성능"도 이 계열 기준). 아키텍처는 `models/W2V.py`의 `Model` — MMS(wav2vec2 계열) SSL 프론트엔드로 프레임별 임베딩을 뽑고 평균 풀링 후 선형 분류. **그래프 어텐션 기반(AASIST 헤드) 구조가 아니다** — 저장소에 `models/AASIST.py`(AASIST 전용 체크포인트)도 있지만, 그건 SSL 없이 스펙트럼 기반이라 형 문서가 평가한 일반화 성능이 적용되지 않는 별도 체크포인트이므로 채택하지 않는다.
 
-## 3. Explainability 스파이크 결과 (2026-08-18 확인)
+## 3. Explainability 스파이크 결과 (2026-08-18 확인, 1차 조사 정정됨)
 
-AntiDeepfake의 README/공식 문서는 explainability를 언급하지 않지만, 소스코드(`models/aasist/AASIST.py`) 확인 결과:
+**1차 조사(오답)**: 처음엔 `models/aasist/AASIST.py`의 그래프 어텐션(temporal/spectral GAT)에서 hook으로 attention을 뽑는 방안을 검토했으나, 이는 위에서 채택하지 않기로 한 AASIST 전용 체크포인트에만 있는 구조라 mms_300m에는 해당하지 않는다.
 
-- 모델 내부에 **Temporal GAT**(`GAT_layer_T`, 시간 구간별 노드에 대한 그래프 어텐션)와 **Spectral GAT**(`GAT_layer_S`, 주파수 대역별 노드에 대한 그래프 어텐션)가 있음
-- `GraphPool` 레이어가 각 노드에 attention 기반 중요도 점수를 매김 (docstring: "scores: attention-based weights (#bs, #node, 1)")
-- 단, 현재 `Model.forward()`는 이 중간 attention 값을 버리고 최종 `(last_hidden, output)`만 반환 — SPAI가 CLI 옵션 없이는 score만 주는 것과 동일한 상황
-
-**해결 방법**: SPAI는 CLI 플래그(`--opt TEST.EXPORT_IMAGE_PATCHES true`)로 해결했지만, AntiDeepfake는 그런 옵션이 없으므로 **PyTorch forward hook**을 `GAT_layer_T`/`GAT_layer_S`/`GraphPool` 모듈에 걸어서 추론 중 중간 attention 값을 가로챈다. 모델 코드 자체를 수정하지 않는 비침습적 방법이며, 라이선스 문제 없음(추론 중 중간값을 읽는 것뿐, 가중치 재배포 아님).
+**정정된 결과**: `models/W2V.py`의 `Model` 클래스에 **이미 구현되어 있는 `forward_seg(wav)` 메서드**를 그대로 쓰면 된다.
+- 일반 `forward(wav)`는 SSL이 뽑은 프레임별 임베딩(`emb`, shape `[batch, frame, hidden_dim]`)을 시간축으로 평균 풀링한 뒤 분류 → 오디오 전체에 대한 점수 하나만 나옴
+- `forward_seg(wav)`는 풀링 전 **프레임별 임베딩 각각에 분류 헤드(`proj_fc`)를 직접 적용** → 프레임 하나하나에 대한 fake/real 점수가 나옴(shape `[frame, 2]`)
+- 즉 hook을 새로 걸 필요 없이 기존 메서드 호출만으로 "몇 번째 프레임(≈몇 초 구간)이 의심스러운지" 시간축 타임라인을 얻을 수 있음
+- **한계**: 이 구조엔 주파수 대역(spectral) 축이 없다 — SSL 임베딩은 이미 시간축으로만 나오는 구조라, "어느 주파수 대역이 이상한지"는 이 체크포인트로는 낼 수 없음. **§5의 `Evidence`에서 스펙트럼 필드 제외, 시간 구간(temporal)만 지원**
+- 프레임→초 변환 계수(SSL 모델의 frame stride, wav2vec2 계열은 보통 16kHz 기준 20ms/프레임)는 데스크탑에서 실제 체크포인트로 검증 필요 (SPAI 때도 실측 후 확정된 값들이 있었던 것과 동일한 종류의 실증 확인 사항)
 
 ## 4. 아키텍처
 
@@ -35,21 +36,23 @@ iOS 앱
   → Spring 서버 (오케스트레이터, veritae-server)
       Controller(Delegate) → AudioAnalysisService → AudioDetectionClient(인터페이스) → HTTP 어댑터
   → Python 탐지 서버 (veritae-detection-server, 3060Ti 데스크탑)
-      새 라우터 POST /process/audio → AntiDeepfake 모델을 프로세스 안에 상주시켜 추론
-                                     + forward hook으로 attention 추출 → evidence 생성
+      새 라우터 POST /process/audio → subprocess로 별도 스크립트 실행(SPAI와 동일 패턴)
+                                     → 결과(score + 시간구간 evidence)를 JSON 파일로 받아 읽음
 ```
 
 이미지 흐름(`ImageAnalysisService`/`DetectionClient`/`SpaiHttpDetectionClient`)은 변경하지 않는다. 음성은 **완전히 별도의 인터페이스/어댑터**로 나란히 추가한다.
 
 **인터페이스를 이미지와 분리하는 이유**: 영상은 추후 비동기 잡 패턴이 필요해질 예정이라(§8 참고), 이미지/음성과는 흐름 자체가 다르다. 하나의 `DetectionClient` 인터페이스에 모든 모달리티 메서드를 몰아넣으면 한쪽 변경이 다른 쪽에 영향을 준다. 모달리티별로 인터페이스를 쪼개 인터페이스 분리 원칙(ISP)을 지킨다.
 
-### Python 서버 통합 방식이 이미지와 다른 점
+### Python 서버 통합 방식 (2026-08-18 정정: SPAI와 동일 패턴으로 확정)
 
-SPAI는 subprocess로 CLI를 매 요청마다 새로 띄우고 CSV 파일로 결과를 주고받는다 (`spai_runner.py`). 음성은 attention hook을 걸려면 파이썬 프로세스 안에서 모델 객체에 직접 접근해야 하므로 subprocess 방식이 불가능하다.
+**1차 계획(오답)**: FastAPI 프로세스 안에 모델을 상주시켜 직접 로드하는 방식을 검토했으나, AntiDeepfake의 실제 설치 요구사항(fairseq 특정 구버전 커밋 빌드, speechbrain 등 — SPAI 못지않게 무겁고 예민한 의존성)을 확인한 뒤 폐기.
 
-**대신**: FastAPI 앱 시작 시(또는 첫 요청 시 lazy) AntiDeepfake 모델을 **프로세스 메모리에 상주**시켜 로드하고, 이후 모든 요청은 이미 로드된 모델 객체로 추론한다. SPAI처럼 매 요청 subprocess를 새로 띄우는 것보다 훨씬 빠르다 (모델 재로딩 비용이 없음).
-
-이로 인해 `detection-api` conda env(기존에는 FastAPI만 있는 가벼운 env)에 torch/transformers/AntiDeepfake 의존성이 새로 추가되어야 한다. 기존에 SPAI 전용이었던 `spai` conda env와는 무관.
+**확정된 방식**: SPAI(`spai_runner.py`)와 완전히 동일한 패턴.
+- 무거운 의존성(fairseq 등)은 SPAI 전용 `spai` conda env와 별개인 **새 `antideepfake` conda env**에 격리
+- FastAPI가 도는 `detection-api` env는 계속 가볍게 유지 — torch/fairseq 등을 넣지 않음
+- `detection-api`가 `antideepfake` env의 커스텀 추론 스크립트(우리가 직접 작성, AntiDeepfake 저장소 코드를 import해서 체크포인트 로드 + `forward_seg` 호출)를 **subprocess로 실행**, 결과(score + 시간구간별 점수)를 JSON 파일로 저장 → `detection-api`가 그 파일을 읽어 응답 조립
+- 형 문서(§6)에 따르면 음성은 CPU 추론으로 충분 — `antideepfake` env의 torch는 **CPU 전용 빌드**로 설치(SPAI의 CUDA 빌드와 별개, 같은 GPU를 두 env가 동시에 점유할 필요가 없어 단순함)
 
 ## 5. 컴포넌트 (Spring, 신규)
 
@@ -60,7 +63,7 @@ SPAI는 subprocess로 CLI를 매 요청마다 새로 띄우고 CSV 파일로 결
 | `detection/AudioDetectionClient` | 포트 인터페이스 |
 | `detection/antideepfake/AntiDeepfakeHttpDetectionClient` | 어댑터, `SpaiHttpDetectionClient`와 동일 스타일 (`RestClient` + `MultipartBodyBuilder`) |
 | `detection/AiDetectionResult` | 기존 `{model, score}`에 `List<Evidence> evidence` 필드 **추가** — 이미지도 나중에 히트맵 작업 시 이 필드를 채우게 될 공용 타입. 이미지는 당장 빈 리스트 |
-| `detection/Evidence` | `{title, description, tags, startSec?, endSec?, freqLowHz?, freqHighHz?}` — record, 시간/주파수 필드는 evidence 종류에 따라 null 허용 |
+| `detection/Evidence` | `{title, description, tags, startSec, endSec}` — record. §3 정정에 따라 시간 구간(temporal)만 지원, 주파수 필드 없음 |
 | `api/AnalysisApiDelegateImpl` | `analyzeAudio` 메서드 추가 |
 | `api/AnalysisApiMapper` | 음성 응답 매핑 로직 추가 (기존 확장 or 별도 메서드) |
 
@@ -69,8 +72,8 @@ SPAI는 subprocess로 CLI를 매 요청마다 새로 띄우고 CSV 파일로 결
 1. 앱 → `POST /api/v1/analysis/audio` (bearer 인증, multipart, 이미지와 동일 인증 방식)
 2. `AudioAnalysisService.validate()` — 빈 파일 / 허용 포맷(wav, mp3, m4a, aac) / 5분 초과 / 25MB 초과 체크
 3. `AntiDeepfakeHttpDetectionClient` → Python `/process/audio` 호출
-4. Python: 상주 모델로 추론 + forward hook으로 temporal/spectral attention 추출
-5. `score >= 0.5`일 때만 evidence 생성 — attention 상위 3개 구간(temporal + spectral 합쳐 top 3)을 규칙 기반 문장으로 변환. `score < 0.5`면 evidence 빈 배열
+4. Python: subprocess로 추론 스크립트 실행 → `forward_seg`로 프레임별 점수 획득 → JSON 파일로 결과 저장 → 라우터가 읽음
+5. `score >= 0.5`일 때만 evidence 생성 — 프레임별 점수 중 상위 3개 구간(연속 프레임을 하나의 구간으로 병합)을 규칙 기반 문장으로 변환. `score < 0.5`면 evidence 빈 배열
 6. Spring이 결과를 그대로 매핑해 응답
 
 ## 7. 에러 처리
@@ -104,4 +107,4 @@ Claude Code 세션은 이 노트북(veritae-server, veritae-detection-server 로
 1. Spring 쪽 구현 (이 레포)
 2. Python 쪽 구현 (veritae-detection-server 로컬 클론)
 3. 두 레포 git commit/push
-4. 사용자가 데스크탑에서 `git pull` + 새 의존성 설치(`detection-api` env에 torch/transformers 등 추가) + AntiDeepfake 가중치 다운로드 — Claude가 명령어 리스트 제공, 사용자가 직접 실행하고 결과를 공유하며 트러블슈팅 (SPAI 셋업 때와 동일한 방식)
+4. 사용자가 데스크탑에서 `git pull` + 새 `antideepfake` conda env 생성(fairseq 특정 커밋 빌드 포함) + AntiDeepfake 저장소 클론 + `mms_300m` 체크포인트 다운로드 — Claude가 명령어 리스트 제공, 사용자가 직접 실행하고 결과를 공유하며 트러블슈팅 (SPAI 셋업 때와 동일한 방식). `detection-api` env는 변경 없음(가벼운 상태 유지)
