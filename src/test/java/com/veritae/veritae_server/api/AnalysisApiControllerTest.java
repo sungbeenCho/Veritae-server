@@ -49,6 +49,18 @@ class AnalysisApiControllerTest {
     }
 
     @Test
+    @WithMockUser
+    void analyzeImage_withFileLargerThanSpringDefaultMultipartLimit_shouldNotBeRejectedByFramework()
+            throws Exception {
+        byte[] largeContent = new byte[5 * 1024 * 1024]; // 5MB > Spring Boot 기본 max-file-size(1MB)
+        var file = new MockMultipartFile("file", "test.jpg", "image/jpeg", largeContent);
+        when(imageAnalysisService.analyzeImage(any())).thenReturn(new AiDetectionResult("spai", 0.87));
+
+        mockMvc.perform(multipart("/api/v1/analysis/image").file(file))
+                .andExpect(status().isOk());
+    }
+
+    @Test
     void analyzeImage_withoutAuthentication_shouldReturn401() throws Exception {
         var file = new MockMultipartFile("file", "test.jpg", "image/jpeg", "fake-bytes".getBytes());
 
