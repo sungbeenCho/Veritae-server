@@ -33,8 +33,9 @@ public class AudioAnalysisService {
         if (file.isEmpty()) {
             throw new InvalidAudioFileException("빈 파일은 분석할 수 없습니다.");
         }
-        if (!ALLOWED_CONTENT_TYPES.contains(file.getContentType())) {
-            throw new InvalidAudioFileException("지원하지 않는 파일 형식입니다: " + file.getContentType());
+        String contentType = file.getContentType();
+        if (contentType == null || !ALLOWED_CONTENT_TYPES.contains(contentType)) {
+            throw new InvalidAudioFileException("지원하지 않는 파일 형식입니다: " + contentType);
         }
         if (file.getSize() > MAX_FILE_SIZE_BYTES) {
             throw new InvalidAudioFileException("파일 용량이 25MB를 초과합니다.");

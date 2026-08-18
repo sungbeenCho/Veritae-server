@@ -66,6 +66,17 @@ class AudioAnalysisServiceTest {
     }
 
     @Test
+    void analyzeAudio_withNullContentType_shouldThrowInvalidAudioFileException() {
+        // Given
+        var file = new MockMultipartFile("file", "test.wav", null, "not-audio".getBytes());
+
+        // When / Then
+        assertThatThrownBy(() -> audioAnalysisService.analyzeAudio(file))
+                .isInstanceOf(InvalidAudioFileException.class);
+        verifyNoInteractions(audioDetectionClient);
+    }
+
+    @Test
     void analyzeAudio_withFileLargerThan25Mb_shouldThrowInvalidAudioFileException() {
         // Given
         byte[] tooLarge = new byte[26 * 1024 * 1024];
