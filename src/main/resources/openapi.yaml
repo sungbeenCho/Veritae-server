@@ -157,6 +157,44 @@ paths:
         default:
           $ref: '#/components/responses/ServerError'
 
+  /api/v1/analysis/audio:
+    post:
+      tags: [Analysis]
+      operationId: analyzeAudio
+      summary: 음성 AI 생성 여부 분석
+      description: >-
+        업로드한 음성이 AI로 생성(합성)되었을 확률과 판독 근거를 반환한다. 탐지 서버(별도 인프라) 호출이 끝날 때까지
+        응답을 기다리는 동기 방식이다.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: 분석할 음성 파일(wav/mp3/m4a/aac, 최대 5분/25MB).
+      responses:
+        '200':
+          description: 분석 성공
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AudioAnalysisResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '502':
+          $ref: '#/components/responses/DetectionServiceUnavailable'
+        default:
+          $ref: '#/components/responses/ServerError'
+
 components:
   securitySchemes:
     bearerAuth:
@@ -302,9 +340,16 @@ components:
         aiDetection:
           $ref: '#/components/schemas/AiDetectionResult'
 
+    AudioAnalysisResponse:
+      type: object
+      required: [aiDetection]
+      properties:
+        aiDetection:
+          $ref: '#/components/schemas/AiDetectionResult'
+
     AiDetectionResult:
       type: object
-      required: [model, score]
+      required: [model, score, evidence]
       properties:
         model:
           type: string
@@ -319,6 +364,47 @@ components:
           maximum: 1
           description: AI 생성물일 확률(0~1). 1에 가까울수록 AI 생성 가능성이 높다.
           example: 0.000134
+        evidence:
+          type: array
+          nullable: false
+          description: 판독 근거 카드 목록. 근거가 없으면 빈 배열.
+          items:
+            $ref: '#/components/schemas/Evidence'
+
+    Evidence:
+      type: object
+      required: [title, description, tags, startSec, endSec]
+      properties:
+        title:
+          type: string
+          nullable: false
+          description: 근거 카드 제목.
+          example: 시간 구간 이상 패턴
+        description:
+          type: string
+          nullable: false
+          description: 이 구간이 왜 의심스러운지에 대한 설명.
+          example: 0.5초~1.2초 구간에서 합성 흔적이 감지됨
+        tags:
+          type: array
+          nullable: false
+          items:
+            type: string
+          example: [temporal]
+        startSec:
+          type: number
+          format: double
+          nullable: false
+          minimum: 0
+          description: 근거 구간 시작 시각(초).
+          example: 0.5
+        endSec:
+          type: number
+          format: double
+          nullable: false
+          minimum: 0
+          description: 근거 구간 종료 시각(초).
+          example: 1.2
 
     ProblemDetail:
       type: object

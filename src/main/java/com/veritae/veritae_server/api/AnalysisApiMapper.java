@@ -10,6 +10,6 @@ public final class AnalysisApiMapper {
 
     public static ImageAnalysisResponse toResponse(AiDetectionResult result) {
         return new ImageAnalysisResponse(
-                new com.veritae.veritae_server.openapi.model.AiDetectionResult(result.model(), result.score()));
+                new com.veritae.veritae_server.openapi.model.AiDetectionResult(result.model(), result.score(), java.util.List.of()));
     }
 }
