@@ -148,6 +148,11 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ImageAnalysisResponse'
+              example:
+                aiDetection:
+                  model: spai
+                  score: 0.000134
+                  evidence: []
         '400':
           $ref: '#/components/responses/ValidationError'
         '401':
