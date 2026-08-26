@@ -24,6 +24,8 @@ public final class AnalysisApiMapper {
         List<Evidence> evidence = result.evidence().stream()
                 .map(e -> new Evidence(e.title(), e.description(), e.tags(), e.startSec(), e.endSec()))
                 .toList();
-        return new com.veritae.veritae_server.openapi.model.AiDetectionResult(result.model(), result.score(), evidence);
+        return new com.veritae.veritae_server.openapi.model.AiDetectionResult(
+                result.model(), result.score(), evidence)
+                .evidenceImage(result.evidenceImage());
     }
 }

@@ -33,7 +33,7 @@ class ImageAnalysisServiceTest {
         // Given
         var file = new MockMultipartFile("file", "test.jpg", "image/jpeg", "fake-bytes".getBytes());
         when(detectionClient.detectImage(file.getBytes(), "test.jpg", "image/jpeg"))
-                .thenReturn(new AiDetectionResult("spai", 0.87, List.of()));
+                .thenReturn(new AiDetectionResult("spai", 0.87, List.of(), null));
 
         // When
         AiDetectionResult result = imageAnalysisService.analyzeImage(file);

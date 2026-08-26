@@ -33,7 +33,7 @@ class AudioAnalysisServiceTest {
         // Given
         var file = new MockMultipartFile("file", "test.wav", "audio/wav", "fake-bytes".getBytes());
         when(audioDetectionClient.detectAudio(file.getBytes(), "test.wav", "audio/wav"))
-                .thenReturn(new AiDetectionResult("antideepfake", 0.87, List.of()));
+                .thenReturn(new AiDetectionResult("antideepfake", 0.87, List.of(), null));
 
         // When
         AiDetectionResult result = audioAnalysisService.analyzeAudio(file);

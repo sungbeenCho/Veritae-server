@@ -51,7 +51,7 @@ public class AntiDeepfakeHttpDetectionClient implements AudioDetectionClient {
             List<Evidence> evidence = response.aiDetection().evidence().stream()
                     .map(e -> new Evidence(e.title(), e.description(), e.tags(), e.startSec(), e.endSec()))
                     .toList();
-            return new AiDetectionResult(response.aiDetection().model(), response.aiDetection().score(), evidence);
+            return new AiDetectionResult(response.aiDetection().model(), response.aiDetection().score(), evidence, null);
         } catch (RestClientException e) {
             throw new DetectionServiceException("탐지 서버 호출에 실패했습니다: " + e.getMessage(), e);
         }

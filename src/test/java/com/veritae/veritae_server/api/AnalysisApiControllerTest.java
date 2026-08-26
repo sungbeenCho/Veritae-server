@@ -47,7 +47,7 @@ class AnalysisApiControllerTest {
     @WithMockUser
     void analyzeImage_withAuthenticatedMemberAndValidFile_shouldReturn200WithScore() throws Exception {
         var file = new MockMultipartFile("file", "test.jpg", "image/jpeg", "fake-bytes".getBytes());
-        when(imageAnalysisService.analyzeImage(any())).thenReturn(new AiDetectionResult("spai", 0.87, List.of()));
+        when(imageAnalysisService.analyzeImage(any())).thenReturn(new AiDetectionResult("spai", 0.87, List.of(), null));
 
         mockMvc.perform(multipart("/api/v1/analysis/image").file(file))
                 .andExpect(status().isOk())
@@ -66,7 +66,7 @@ class AnalysisApiControllerTest {
         // 운영 환경에서 실제 HTTP 요청 시에는 서블릿 컨테이너가 이 설정을 적용한다.
         byte[] largeContent = new byte[5 * 1024 * 1024]; // 5MB > Spring Boot 기본 max-file-size(1MB)
         var file = new MockMultipartFile("file", "test.jpg", "image/jpeg", largeContent);
-        when(imageAnalysisService.analyzeImage(any())).thenReturn(new AiDetectionResult("spai", 0.87, List.of()));
+        when(imageAnalysisService.analyzeImage(any())).thenReturn(new AiDetectionResult("spai", 0.87, List.of(), null));
 
         mockMvc.perform(multipart("/api/v1/analysis/image").file(file))
                 .andExpect(status().isOk());
@@ -88,7 +88,8 @@ class AnalysisApiControllerTest {
                 "antideepfake", 0.87,
                 List.of(new Evidence(
                         "시간 구간 이상 패턴", "0.5초~1.2초 구간에서 합성 흔적이 감지됨",
-                        List.of("temporal"), 0.5, 1.2))));
+                        List.of("temporal"), 0.5, 1.2)),
+                null));
 
         mockMvc.perform(multipart("/api/v1/analysis/audio").file(file))
                 .andExpect(status().isOk())

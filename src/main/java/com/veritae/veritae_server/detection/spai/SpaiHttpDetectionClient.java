@@ -45,7 +45,7 @@ public class SpaiHttpDetectionClient implements DetectionClient {
             if (response == null || response.aiDetection() == null) {
                 throw new DetectionServiceException("탐지 서버 응답이 비어 있습니다.", null);
             }
-            return new AiDetectionResult(response.aiDetection().model(), response.aiDetection().score(), List.of());
+            return new AiDetectionResult(response.aiDetection().model(), response.aiDetection().score(), List.of(), null);
         } catch (RestClientException e) {
             throw new DetectionServiceException("탐지 서버 호출에 실패했습니다: " + e.getMessage(), e);
         }
