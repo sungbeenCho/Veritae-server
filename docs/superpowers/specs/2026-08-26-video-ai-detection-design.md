@@ -35,18 +35,21 @@
 ## 3. 선정 모델
 
 **GenConViT** (erprogs, github.com/erprogs/GenConViT)
-- 코드 MIT, 가중치 **CC BY-NC 4.0(비상업)** — 이 프로젝트는 유료화 계획이 없어 AntiDeepfake 때와 같은 논리로 문제없음
-- 얼굴 딥페이크(face-swap) 전용, `prediction.py` 단일 스크립트 추론이라 SPAI/AntiDeepfake와 같은 subprocess 패턴 적용 가능
-- GPU 4GB+ (fp16), 3060Ti 8GB로 충분
+- **라이선스 정정(2026-08-26 self-review, GitHub API로 직접 확인)**: 형 문서(8/14)는 "가중치 CC BY-NC 4.0(비상업)"로 적었으나, 저장소를 직접 확인한 결과 `LICENSE` 파일 + README 모두 **코드·가중치 전부 MIT**로 명시되어 있음(별도 가중치 라이선스 조항 없음). 형 리서치 에이전트의 오류로 보임 — "유료화 계획 없어서 문제없음" 같은 정당화 논리 자체가 불필요, 그냥 완전히 클린한 라이선스임.
+- 얼굴 딥페이크(face-swap) 전용, ConvNeXt+Swin Transformer 하이브리드 구조(순수 CNN 아님), `prediction.py` 단일 스크립트 추론이라 SPAI/AntiDeepfake와 같은 subprocess 패턴 적용 가능
+- GPU 4GB+ (fp16) — 형 문서 수치 인용, **실측 안 됨**. SPAI도 실제 폰 사진에서 VRAM 문제가 처음 나왔던 전례가 있으니 데스크탑에서 실측 전까지는 참고치로만 취급할 것.
+- **⚠️ 프레임별 점수는 기본적으로 노출되지 않음 (2026-08-26 self-review, `model/pred_func.py` 소스 직접 확인)**: `pred_vid()`가 내부적으로 `torch.sigmoid(model(df).squeeze())`로 프레임별 예측 텐서를 계산하긴 하지만, 곧바로 `max_prediction_value()`가 `torch.mean(y_pred, dim=0)`으로 전체 프레임 평균을 내버리고 **평균 낸 스칼라 값만 반환**한다. `predict()`/`store_result()`도 영상당 값 하나만 저장. 즉 AntiDeepfake의 `forward_seg()`처럼 "이미 있는 메서드를 호출하기만 하면 되는" 상황이 아니라, **우리가 직접 `pred_vid()`를 감싸거나 대체해서 평균 내기 전의 프레임별 텐서를 가로채는 코드를 짜야 함** — §4 참고. 큰 작업은 아니지만 "그냥 있는 필드 쓰면 됨"이 아니라는 걸 명확히 해둔다.
 
-**대안(백업, GenConViT 데스크탑 셋업이 실제로 안 될 경우):** selimsef/dfdc_deepfake_challenge — 코드+가중치 완전 MIT, 단 2021년 이후 모델 동결이라 최신 face-swap 툴엔 정확도 저하 우려. GPU 8-12GB 권장(단일 모델로 축소 가능).
+**대안(백업, GenConViT 데스크탑 셋업이 실제로 안 될 경우):** selimsef/dfdc_deepfake_challenge — 코드+가중치 완전 MIT(GitHub API로 확인), 단 2021년 이후 모델 동결이라 최신 face-swap 툴엔 정확도 저하 우려. GPU 8-12GB 권장(단일 모델로 축소 가능).
 
 ## 4. Explainability 설계
 
-형 문서 §4 권장 조합(Grad-CAM 히트맵 + 규칙 기반 문장)을 그대로 따른다. GenConViT는 프레임별 점수를 내므로, 신호가 두 종류 나온다 — **둘 다 GenConViT 자체 계산에서 나오는 값**이라(SPAI 히트맵과 같은 논리) 별도 융합 로직이 필요 없다:
+형 문서 §4 권장 조합(Grad-CAM 히트맵 + 규칙 기반 문장)을 따른다. 신호를 두 종류 계획하는데, **둘 다 GenConViT 자체 계산에서 나오는 값**이라(SPAI 히트맵과 같은 논리) 별도 융합 로직은 필요 없다 — 다만 아래 두 개 다 **§3에서 확인했듯 "기본 제공"이 아니라 우리가 직접 구현해야 하는 부분**이므로, 구현 전 실제 검증(spike)이 필요하다:
 
-1. **공간적 근거**: `jacobgil/pytorch-grad-cam`(MIT, 활발히 유지보수) 적용 — 가장 의심스러운 프레임에서 모델이 주목한 얼굴 영역을 히트맵으로 오버레이. 이미지 SPAI 히트맵과 동일한 `evidenceImage`(base64 PNG) 필드 재사용.
-2. **시간적 근거**: 프레임별 점수를 이어붙여, 오디오 evidence와 동일한 패턴(연속 구간 병합 → 상위 N개 구간을 규칙 기반 문장으로 변환)으로 "N~M초 구간 의심" 카드 생성. 기존 `Evidence`(`title`, `description`, `tags`, `startSec`, `endSec`) 타입 그대로 재사용.
+1. **공간적 근거 (Grad-CAM) — ⚠️ 적용 가능 여부 미검증**: `jacobgil/pytorch-grad-cam`(MIT, 활발히 유지보수) 적용을 계획하나, GenConViT 저장소엔 Grad-CAM/attention 시각화 관련 코드나 언급이 전혀 없음(2026-08-26 self-review로 확인). GenConViT는 ConvNeXt+Swin Transformer 하이브리드(순수 CNN 아님) + 두 개의 독립 네트워크(ED/VAE) 구조라, Grad-CAM이 타겟할 "마지막 conv layer"를 어디로 잡을지가 순수 CNN(SPAI)만큼 명확하지 않다. **구현 착수 전 실제로 히트맵이 얼굴의 말이 되는 영역을 가리키는지 데스크탑에서 스파이크로 확인 필요** — 안 되면 대안(예: occlusion-based saliency, 또는 히트맵 없이 시간적 근거만으로 축소)을 그때 논의.
+2. **시간적 근거**: §3에서 확인한 대로, `pred_vid()`를 그대로 안 쓰고 프레임별 sigmoid 예측값을 평균 내기 전에 가로채는 우리 자체 코드를 작성 → 오디오 evidence와 동일한 패턴(연속 구간 병합 → 상위 N개 구간을 규칙 기반 문장으로 변환)으로 "N~M초 구간 의심" 카드 생성. 기존 `Evidence`(`title`, `description`, `tags`, `startSec`, `endSec`) 타입 그대로 재사용. 이쪽은 Grad-CAM보다 확실성이 높음(모델 출력을 가로채기만 하면 되고, 아키텍처 특수성에 좌우되지 않음).
+
+**최악의 경우(Grad-CAM이 이 구조에 안 맞는 걸로 판명나면):** 공간적 근거 없이 시간적 근거(구간)만으로 §4를 축소하는 것도 fallback으로 고려 — 오디오가 처음부터 시간적 근거만으로 시작했던 것과 같은 수준이 되므로, 완전히 근거 없는 상태(score만)로 떨어지는 건 아님.
 
 ## 5. 아키텍처 — 비동기 잡 모델
 
