@@ -67,10 +67,11 @@ class VideoAnalysisAsyncWorkerTest {
         // When
         worker.process(job.getId(), "fake-bytes".getBytes(), "test.mp4", "video/mp4");
 
-        // Then
+        // Then: errorMessage는 탐지 서버의 원문 에러(내부 경로/traceback 가능성)를 그대로 노출하지 않고
+        // 일반화된 메시지로 저장되어야 한다.
         verify(analysisJobRepository, org.mockito.Mockito.atLeastOnce()).save(jobCaptor.capture());
         AnalysisJob savedJob = jobCaptor.getValue();
         assertThat(savedJob.getStatus()).isEqualTo(AnalysisJobStatus.FAILED);
-        assertThat(savedJob.getErrorMessage()).isEqualTo("탐지 서버 호출에 실패했습니다.");
+        assertThat(savedJob.getErrorMessage()).isEqualTo("영상 분석 중 오류가 발생했습니다.");
     }
 }

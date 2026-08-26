@@ -78,6 +78,17 @@ class VideoAnalysisServiceTest {
     }
 
     @Test
+    void submitVideo_withNullContentType_shouldThrowInvalidVideoFileException() {
+        // Given
+        var file = new MockMultipartFile("file", "test.mp4", null, "not-a-video".getBytes());
+
+        // When / Then
+        assertThatThrownBy(() -> videoAnalysisService.submitVideo(file, UUID.randomUUID()))
+                .isInstanceOf(InvalidVideoFileException.class);
+        verifyNoInteractions(analysisJobRepository, videoAnalysisAsyncWorker);
+    }
+
+    @Test
     void submitVideo_withFileLargerThan100Mb_shouldThrowInvalidVideoFileException() {
         // Given
         byte[] tooLarge = new byte[101 * 1024 * 1024];

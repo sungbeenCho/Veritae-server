@@ -7,6 +7,7 @@ import com.veritae.veritae_server.detection.VideoDetectionClient;
 import com.veritae.veritae_server.domain.analysisjob.AnalysisJob;
 import com.veritae.veritae_server.domain.analysisjob.AnalysisJobRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 
@@ -19,6 +20,7 @@ import java.util.UUID;
  * 실제 탐지 서버 호출 + 상태 갱신을 비동기로 수행한다. 별도 빈으로 분리한 이유는
  * VideoAnalysisService의 클래스 주석 참고(스프링 @Async self-invocation 함정).
  */
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class VideoAnalysisAsyncWorker {
@@ -43,7 +45,11 @@ public class VideoAnalysisAsyncWorker {
             AiDetectionResult result = videoDetectionClient.detectVideo(videoBytes, filename, contentType);
             job.markCompleted(writeResultJson(result));
         } catch (Exception e) {
-            job.markFailed(e.getMessage());
+            // 탐지 서버(Python)가 던지는 원문 에러 메시지에는 내부 경로/traceback 일부가 섞여 나올 수 있어
+            // 클라이언트(errorMessage)에 그대로 노출하지 않는다. 상세 원인은 로그에만 남기고,
+            // 사용자에게는 일반화된 메시지만 전달한다.
+            log.error("영상 분석 실패 jobId={}", jobId, e);
+            job.markFailed("영상 분석 중 오류가 발생했습니다.");
         }
         analysisJobRepository.save(job);
     }
