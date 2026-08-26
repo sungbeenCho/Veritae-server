@@ -89,14 +89,14 @@ iOS 앱 → Spring 서버(오케스트레이터) → Python 탐지 서버(3060Ti
 |---|---|
 | `app/routers/video.py` | `POST /process/video` — 기존 `image.py`/`audio.py`와 동일 스타일 |
 | `app/services/dfdc_runner.py` | 기존 `spai_runner.py`/`antideepfake_runner.py`와 동일하게, 무거운 의존성은 별도 conda env(`dfdc`)에 격리, subprocess로 커스텀 추론 스크립트 실행 |
-| 커스텀 추론 스크립트 | ffmpeg로 얼굴 검출 프레임 샘플링 → selimsef(EfficientNet-B7) 추론(프레임별 점수) → Grad-CAM으로 최고 의심 프레임 히트맵 생성 → 결과 JSON(`score`, `evidence_image`, `evidence[]`) 저장 |
+| 커스텀 추론 스크립트 | OpenCV(`cv2.VideoCapture`)+facenet-pytorch(MTCNN)로 얼굴 검출 프레임 샘플링(§3에서 정정된 대로 ffmpeg 아님) → selimsef(EfficientNet-B7) 추론(프레임별 점수) → Grad-CAM으로 최고 의심 프레임 히트맵 생성 → 결과 JSON(`score`, `evidence_image`, `evidence[]`) 저장 |
 
 ## 8. 데이터 흐름 (성공 케이스)
 
 1. 앱 → `POST /api/v1/analysis/video` → `AnalysisJob` PENDING 생성, `202 Accepted` + jobId
 2. `VideoAnalysisService.validate()` — 빈 파일/허용 포맷/용량·길이 제한 체크
 3. 비동기로 `DfdcHttpDetectionClient` → Python `/process/video` 호출, job 상태 PROCESSING
-4. Python: ffmpeg 얼굴 프레임 샘플링 → selimsef 프레임별 추론 → Grad-CAM 히트맵 → 시간적 evidence 생성 → JSON 반환
+4. Python: OpenCV/MTCNN 얼굴 프레임 샘플링 → selimsef 프레임별 추론 → Grad-CAM 히트맵 → 시간적 evidence 생성 → JSON 반환
 5. Spring이 결과를 `AnalysisJob`에 저장, 상태 COMPLETED
 6. 앱 → `GET /api/v1/analysis/jobs/{jobId}` 폴링 → 결과 수신
 
