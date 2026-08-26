@@ -38,6 +38,12 @@ class AnalysisApiControllerTest {
     @MockitoBean
     private AudioAnalysisService audioAnalysisService;
 
+    @MockitoBean
+    private com.veritae.veritae_server.analysis.VideoAnalysisService videoAnalysisService;
+
+    @MockitoBean
+    private com.veritae.veritae_server.security.AuthenticatedMemberResolver authenticatedMemberResolver;
+
     // JwtAuthenticationFilter 는 @Component(Filter) 라 @WebMvcTest 슬라이스에도 자동 등록되므로,
     // 그 의존성인 JwtTokenProvider 를 만족시켜야 컨텍스트가 뜬다.
     @MockitoBean
@@ -104,6 +110,74 @@ class AnalysisApiControllerTest {
         var file = new MockMultipartFile("file", "test.wav", "audio/wav", "fake-bytes".getBytes());
 
         mockMvc.perform(multipart("/api/v1/analysis/audio").file(file))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @WithMockUser
+    void analyzeVideo_withAuthenticatedMemberAndValidFile_shouldReturn202WithJobId() throws Exception {
+        var file = new MockMultipartFile("file", "test.mp4", "video/mp4", "fake-bytes".getBytes());
+        java.util.UUID jobId = java.util.UUID.randomUUID();
+        java.util.UUID memberId = java.util.UUID.randomUUID();
+        when(authenticatedMemberResolver.currentMemberId()).thenReturn(memberId);
+        when(videoAnalysisService.submitVideo(any(), org.mockito.ArgumentMatchers.eq(memberId))).thenReturn(jobId);
+
+        mockMvc.perform(multipart("/api/v1/analysis/video").file(file))
+                .andExpect(status().isAccepted())
+                .andExpect(jsonPath("$.jobId").value(jobId.toString()));
+    }
+
+    @Test
+    void analyzeVideo_withoutAuthentication_shouldReturn401() throws Exception {
+        var file = new MockMultipartFile("file", "test.mp4", "video/mp4", "fake-bytes".getBytes());
+
+        mockMvc.perform(multipart("/api/v1/analysis/video").file(file))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @WithMockUser
+    void getAnalysisJob_withCompletedJob_shouldReturn200WithResult() throws Exception {
+        java.util.UUID jobId = java.util.UUID.randomUUID();
+        java.util.UUID memberId = java.util.UUID.randomUUID();
+        when(authenticatedMemberResolver.currentMemberId()).thenReturn(memberId);
+        when(videoAnalysisService.getJob(jobId, memberId)).thenReturn(
+                new com.veritae.veritae_server.analysis.AnalysisJobView(
+                        jobId,
+                        com.veritae.veritae_server.domain.analysisjob.AnalysisJobStatus.COMPLETED,
+                        new AiDetectionResult("dfdc", 0.91,
+                                List.of(new Evidence("얼굴 조작 의심 구간", "3.0초~7.0초 구간에서 얼굴 합성 흔적이 감지됨",
+                                        List.of("temporal", "face-swap"), 3.0, 7.0)),
+                                "base64pngdata"),
+                        null));
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/v1/analysis/jobs/" + jobId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.jobId").value(jobId.toString()))
+                .andExpect(jsonPath("$.status").value("COMPLETED"))
+                .andExpect(jsonPath("$.aiDetection.model").value("dfdc"))
+                .andExpect(jsonPath("$.aiDetection.evidenceImage").value("base64pngdata"))
+                .andExpect(jsonPath("$.errorMessage").doesNotExist());
+    }
+
+    @Test
+    @WithMockUser
+    void getAnalysisJob_withNonExistentJob_shouldReturn404() throws Exception {
+        java.util.UUID jobId = java.util.UUID.randomUUID();
+        java.util.UUID memberId = java.util.UUID.randomUUID();
+        when(authenticatedMemberResolver.currentMemberId()).thenReturn(memberId);
+        when(videoAnalysisService.getJob(jobId, memberId))
+                .thenThrow(new com.veritae.veritae_server.analysis.AnalysisJobNotFoundException(jobId));
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/v1/analysis/jobs/" + jobId))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void getAnalysisJob_withoutAuthentication_shouldReturn401() throws Exception {
+        java.util.UUID jobId = java.util.UUID.randomUUID();
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/v1/analysis/jobs/" + jobId))
                 .andExpect(status().isUnauthorized());
     }
 }
