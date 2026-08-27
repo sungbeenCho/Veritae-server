@@ -37,8 +37,12 @@ public class AnalysisJob {
     @Column(nullable = false, length = 20)
     private AnalysisJobStatus status;
 
+    // columnDefinition을 명시하지 않으면 Hibernate가 @Lob String을 MySQL에서 TEXT(64KB
+    // 한계)로 매핑해, evidenceImage(base64 PNG 히트맵)가 포함된 영상 결과 JSON이 그 이상으로
+    // 커지면 "Data too long for column" 오류가 난다(2026-08-27, 실제 Spring↔데스크탑 왕복
+    // 테스트 중 처음 발견 - 이미지/음성은 evidenceImage를 안 써서 이 문제가 없었음).
     @Lob
-    @Column(name = "result_json")
+    @Column(name = "result_json", columnDefinition = "LONGTEXT")
     private String resultJson;
 
     @Column(name = "error_message", length = 1000)
