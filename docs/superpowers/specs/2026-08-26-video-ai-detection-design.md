@@ -39,7 +39,7 @@
 - `DeepFakeClassifier(encoder="tf_efficientnet_b7_ns")` — **순수 CNN**(EfficientNet-B7, timm 라이브러리). ConvNeXt+Swin 하이브리드인 GenConViT와 달리 Grad-CAM 레퍼런스/사례가 아주 많은 표준적인 조합.
 - DFDC(Deepfake Detection Challenge, Meta 주최) 우승작. `predict_folder.py` + Docker, 가중치는 GitHub Releases(~1.9GB)
 - 2021년 이후 모델 동결 — 단, §3-1 참고("실전 정확도" 관련 중요 발견)
-- GPU 8-12GB 권장(앙상블 전체 기준), 단일 모델로 축소해 부담 낮출 수 있음(3060Ti 8GB 고려 시 단일 모델로 시작 권장)
+- **[2026-08-27 정정]** 원래 여기 "GPU 8-12GB 권장(앙상블 전체 기준), 3060Ti 8GB 고려 시 단일 모델로 시작 권장"이라고 적고 실제로 체크포인트 1개만 쓰도록 구현했었다. 그런데 이 "8-12GB" 수치는 selimsef README를 실제로 대조해보니 존재하지 않는 근거였다 — README에 있는 유일한 GPU 메모리 언급은 "training requires 4 GPUs with 12gb+ memory"(4-GPU **학습** 요구사항)였고, 이걸 추론(inference) 요구사항으로 잘못 끌어와 단일 모델 결정을 정당화했던 것. `predict_folder.py`를 보면 체크포인트 여러 개를 fp16으로 동시에 GPU에 올려 추론하는 구조라 메모리 비용은 체크포인트당 수백MB 수준으로 완만하게 증가하고(8GB에서 7개도 무난할 가능성이 높음), 진짜 비용은 추론 **시간**(프레임당 forward pass가 7배)인데 영상 분석은 이미 비동기 잡 구조라 그 비용이 sync 설계 때보다 훨씬 덜 아프다. 따라서 selimsef가 실제로 우승할 때 쓴 7개 체크포인트 풀 앙상블(`predict_submission.sh`/`download_weights.sh`와 동일 구성)로 원복함.
 - **⚠️ 프레임별 점수는 기본적으로 노출되지 않음 (2026-08-26 확인, `kernel_utils.py` 소스 직접 확인)**: `predict_on_video()`가 내부적으로 `torch.sigmoid(y_pred.squeeze())`로 프레임별 예측을 계산하긴 하지만, 곧바로 `confident_strategy`가 `np.mean(preds)`로 평균 내서 **영상당 스칼라 값 하나만 반환**한다. GenConViT와 완전히 동일한 패턴 — AntiDeepfake의 `forward_seg()`처럼 그냥 호출하면 되는 게 아니라, **우리가 평균 내기 전의 프레임별 값을 가로채는 코드를 직접 짜야 함** — §4 참고.
 
 **변경 이유 (GenConViT → selimsef, 2026-08-26):** 처음엔 GenConViT(더 최신, 벤치마크 수치 더 높음)를 골랐으나, self-review 중 Grad-CAM이 GenConViT의 ConvNeXt+Swin 하이브리드 구조에 실제로 적용 가능한지 저장소에 근거가 전혀 없다는 걸 발견. 판독 근거(evidence) 확실성이 이 제품의 핵심 요구사항이라, 순수 CNN이라 Grad-CAM이 훨씬 예측 가능하게 작동하는 selimsef로 최종 변경.
