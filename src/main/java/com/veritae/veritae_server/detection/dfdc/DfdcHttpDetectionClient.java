@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.veritae.veritae_server.detection.AiDetectionResult;
 import com.veritae.veritae_server.detection.DetectionServiceException;
 import com.veritae.veritae_server.detection.Evidence;
+import com.veritae.veritae_server.detection.NoFaceDetectedException;
 import com.veritae.veritae_server.detection.VideoDetectionClient;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.core.io.ByteArrayResource;
@@ -12,6 +13,7 @@ import org.springframework.http.client.MultipartBodyBuilder;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
+import org.springframework.web.client.RestClientResponseException;
 
 import java.util.List;
 
@@ -62,6 +64,13 @@ public class DfdcHttpDetectionClient implements VideoDetectionClient {
                     response.aiDetection().score(),
                     evidence,
                     response.aiDetection().evidenceImage());
+        } catch (RestClientResponseException e) {
+            // 422는 탐지 서버가 "얼굴을 못 찾음"을 명시적으로 알려주는 정상적인 사용자 케이스라,
+            // 그 외 상태코드(장애성)와 구분해서 전용 예외로 던진다(2026-08-27).
+            if (e.getStatusCode().value() == 422) {
+                throw new NoFaceDetectedException();
+            }
+            throw new DetectionServiceException("탐지 서버 호출에 실패했습니다: " + e.getMessage(), e);
         } catch (RestClientException e) {
             throw new DetectionServiceException("탐지 서버 호출에 실패했습니다: " + e.getMessage(), e);
         }
