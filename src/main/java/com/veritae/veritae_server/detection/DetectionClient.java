@@ -7,5 +7,5 @@ package com.veritae.veritae_server.detection;
  */
 public interface DetectionClient {
 
-    AiDetectionResult detectImage(byte[] imageBytes, String filename, String contentType);
+    ImageDetectionResult detectImage(byte[] imageBytes, String filename, String contentType);
 }

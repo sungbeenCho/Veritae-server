@@ -413,14 +413,14 @@ components:
       required: [aiDetection]
       properties:
         aiDetection:
-          $ref: '#/components/schemas/AiDetectionResult'
+          $ref: '#/components/schemas/ImageDetectionResult'
 
     AudioAnalysisResponse:
       type: object
       required: [aiDetection]
       properties:
         aiDetection:
-          $ref: '#/components/schemas/AiDetectionResult'
+          $ref: '#/components/schemas/AudioDetectionResult'
 
     AnalysisJobAcceptedResponse:
       type: object
@@ -450,7 +450,7 @@ components:
           example: COMPLETED
         aiDetection:
           allOf:
-            - $ref: '#/components/schemas/AiDetectionResult'
+            - $ref: '#/components/schemas/VideoDetectionResult'
           nullable: true
           description: status가 COMPLETED일 때만 채워진다.
         errorMessage:
@@ -458,9 +458,13 @@ components:
           nullable: true
           description: status가 FAILED일 때만 채워진다.
 
-    AiDetectionResult:
+    ImageDetectionResult:
       type: object
-      required: [model, score, evidence]
+      required: [model, score]
+      description: >-
+        이미지 AI 판독 결과. SPAI는 근거 카드(evidence)를 만들지 않아 그 필드는 없다.
+        evidenceImage는 히트맵 기능(설계 승인, 구현 보류 중)을 위해 예약된 필드 - 아직
+        미구현이라 항상 null.
       properties:
         model:
           type: string
@@ -475,6 +479,56 @@ components:
           maximum: 1
           description: AI 생성물일 확률(0~1). 1에 가까울수록 AI 생성 가능성이 높다.
           example: 0.000134
+        evidenceImage:
+          type: string
+          nullable: true
+          description: >-
+            판독 근거 히트맵 이미지(base64 인코딩 PNG). 아직 미구현이라 항상 null(2026-08-27
+            기준) - 구현되면 얼굴/이미지의 어느 부분이 의심스러운지 시각적으로 보여줄 예정.
+
+    AudioDetectionResult:
+      type: object
+      required: [model, score, evidence]
+      description: 음성 AI 판독 결과. 공간적 근거(이미지) 개념이 없어 evidenceImage 필드는 없다.
+      properties:
+        model:
+          type: string
+          nullable: false
+          description: 탐지에 사용된 모델 이름.
+          example: antideepfake
+        score:
+          type: number
+          format: double
+          nullable: false
+          minimum: 0
+          maximum: 1
+          description: AI 생성물일 확률(0~1). 1에 가까울수록 AI 생성 가능성이 높다.
+          example: 0.0018
+        evidence:
+          type: array
+          nullable: false
+          description: 판독 근거 카드 목록. 근거가 없으면 빈 배열.
+          items:
+            $ref: '#/components/schemas/Evidence'
+
+    VideoDetectionResult:
+      type: object
+      required: [model, score, evidence]
+      description: 영상 AI 판독 결과. 시간 구간 근거와 공간적 히트맵을 둘 다 지원하는 유일한 포맷.
+      properties:
+        model:
+          type: string
+          nullable: false
+          description: 탐지에 사용된 모델 이름.
+          example: dfdc
+        score:
+          type: number
+          format: double
+          nullable: false
+          minimum: 0
+          maximum: 1
+          description: AI 생성물일 확률(0~1). 1에 가까울수록 AI 생성 가능성이 높다.
+          example: 0.91
         evidence:
           type: array
           nullable: false
@@ -486,7 +540,7 @@ components:
           nullable: true
           description: >-
             판독 근거 히트맵 이미지(base64 인코딩 PNG). 얼굴의 어느 부분이 의심스러운지
-            시각적으로 보여준다. 이미지/음성 분석에서는 채워지지 않아 항상 null.
+            시각적으로 보여준다(best-effort - 실패하면 null).
 
     Evidence:
       type: object

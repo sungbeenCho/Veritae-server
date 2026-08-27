@@ -1,6 +1,6 @@
 package com.veritae.veritae_server.detection.dfdc;
 
-import com.veritae.veritae_server.detection.AiDetectionResult;
+import com.veritae.veritae_server.detection.VideoDetectionResult;
 import com.veritae.veritae_server.detection.DetectionServiceException;
 import com.veritae.veritae_server.detection.NoFaceDetectedException;
 import org.junit.jupiter.api.Test;
@@ -39,7 +39,7 @@ class DfdcHttpDetectionClientTest {
         DfdcHttpDetectionClient client = new DfdcHttpDetectionClient(builder.build());
 
         // When
-        AiDetectionResult result = client.detectVideo("fake-bytes".getBytes(), "test.mp4", "video/mp4");
+        VideoDetectionResult result = client.detectVideo("fake-bytes".getBytes(), "test.mp4", "video/mp4");
 
         // Then
         assertThat(result.model()).isEqualTo("dfdc");
@@ -65,7 +65,7 @@ class DfdcHttpDetectionClientTest {
         DfdcHttpDetectionClient client = new DfdcHttpDetectionClient(builder.build());
 
         // When
-        AiDetectionResult result = client.detectVideo("fake-bytes".getBytes(), "test.mp4", "video/mp4");
+        VideoDetectionResult result = client.detectVideo("fake-bytes".getBytes(), "test.mp4", "video/mp4");
 
         // Then
         assertThat(result.evidenceImage()).isNull();

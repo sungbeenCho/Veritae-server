@@ -1,6 +1,6 @@
 package com.veritae.veritae_server.analysis;
 
-import com.veritae.veritae_server.detection.AiDetectionResult;
+import com.veritae.veritae_server.detection.VideoDetectionResult;
 import com.veritae.veritae_server.detection.DetectionServiceException;
 import com.veritae.veritae_server.detection.NoFaceDetectedException;
 import com.veritae.veritae_server.detection.VideoDetectionClient;
@@ -44,7 +44,7 @@ class VideoAnalysisAsyncWorkerTest {
         AnalysisJob job = AnalysisJob.submit(UUID.randomUUID());
         when(analysisJobRepository.findById(job.getId())).thenReturn(Optional.of(job));
         when(videoDetectionClient.detectVideo(any(), any(), any()))
-                .thenReturn(new AiDetectionResult("dfdc", 0.91, List.of(), "base64png"));
+                .thenReturn(new VideoDetectionResult("dfdc", 0.91, List.of(), "base64png"));
 
         // When
         worker.process(job.getId(), "fake-bytes".getBytes(), "test.mp4", "video/mp4");

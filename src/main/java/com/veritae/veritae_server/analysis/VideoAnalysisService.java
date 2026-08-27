@@ -1,7 +1,7 @@
 package com.veritae.veritae_server.analysis;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.veritae.veritae_server.detection.AiDetectionResult;
+import com.veritae.veritae_server.detection.VideoDetectionResult;
 import com.veritae.veritae_server.domain.analysisjob.AnalysisJob;
 import com.veritae.veritae_server.domain.analysisjob.AnalysisJobRepository;
 import com.veritae.veritae_server.domain.analysisjob.AnalysisJobStatus;
@@ -58,7 +58,7 @@ public class VideoAnalysisService {
             throw new AnalysisJobNotFoundException(jobId);
         }
 
-        AiDetectionResult result = job.getStatus() == AnalysisJobStatus.COMPLETED
+        VideoDetectionResult result = job.getStatus() == AnalysisJobStatus.COMPLETED
                 ? readResultJson(job.getResultJson())
                 : null;
         return new AnalysisJobView(job.getId(), job.getStatus(), result, job.getErrorMessage());
@@ -77,9 +77,9 @@ public class VideoAnalysisService {
         }
     }
 
-    private AiDetectionResult readResultJson(String json) {
+    private VideoDetectionResult readResultJson(String json) {
         try {
-            return OBJECT_MAPPER.readValue(json, AiDetectionResult.class);
+            return OBJECT_MAPPER.readValue(json, VideoDetectionResult.class);
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }

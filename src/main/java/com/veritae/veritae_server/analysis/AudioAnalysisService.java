@@ -1,7 +1,7 @@
 package com.veritae.veritae_server.analysis;
 
-import com.veritae.veritae_server.detection.AiDetectionResult;
 import com.veritae.veritae_server.detection.AudioDetectionClient;
+import com.veritae.veritae_server.detection.AudioDetectionResult;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
@@ -20,7 +20,7 @@ public class AudioAnalysisService {
 
     private final AudioDetectionClient audioDetectionClient;
 
-    public AiDetectionResult analyzeAudio(MultipartFile file) {
+    public AudioDetectionResult analyzeAudio(MultipartFile file) {
         validate(file);
         try {
             return audioDetectionClient.detectAudio(file.getBytes(), file.getOriginalFilename(), file.getContentType());

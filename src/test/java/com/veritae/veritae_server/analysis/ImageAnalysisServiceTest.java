@@ -1,14 +1,12 @@
 package com.veritae.veritae_server.analysis;
 
-import com.veritae.veritae_server.detection.AiDetectionResult;
 import com.veritae.veritae_server.detection.DetectionClient;
+import com.veritae.veritae_server.detection.ImageDetectionResult;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockMultipartFile;
-
-import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -33,10 +31,10 @@ class ImageAnalysisServiceTest {
         // Given
         var file = new MockMultipartFile("file", "test.jpg", "image/jpeg", "fake-bytes".getBytes());
         when(detectionClient.detectImage(file.getBytes(), "test.jpg", "image/jpeg"))
-                .thenReturn(new AiDetectionResult("spai", 0.87, List.of(), null));
+                .thenReturn(new ImageDetectionResult("spai", 0.87, null));
 
         // When
-        AiDetectionResult result = imageAnalysisService.analyzeImage(file);
+        ImageDetectionResult result = imageAnalysisService.analyzeImage(file);
 
         // Then
         assertThat(result.model()).isEqualTo("spai");

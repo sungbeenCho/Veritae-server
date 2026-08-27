@@ -1,6 +1,6 @@
 package com.veritae.veritae_server.detection.spai;
 
-import com.veritae.veritae_server.detection.AiDetectionResult;
+import com.veritae.veritae_server.detection.ImageDetectionResult;
 import com.veritae.veritae_server.detection.DetectionServiceException;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
@@ -30,7 +30,7 @@ class SpaiHttpDetectionClientTest {
         SpaiHttpDetectionClient client = new SpaiHttpDetectionClient(builder.build());
 
         // When
-        AiDetectionResult result = client.detectImage("fake-bytes".getBytes(), "test.jpg", "image/jpeg");
+        ImageDetectionResult result = client.detectImage("fake-bytes".getBytes(), "test.jpg", "image/jpeg");
 
         // Then
         assertThat(result.model()).isEqualTo("spai");

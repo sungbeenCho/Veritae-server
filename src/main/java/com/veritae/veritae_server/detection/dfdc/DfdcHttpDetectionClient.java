@@ -1,11 +1,11 @@
 package com.veritae.veritae_server.detection.dfdc;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.veritae.veritae_server.detection.AiDetectionResult;
 import com.veritae.veritae_server.detection.DetectionServiceException;
 import com.veritae.veritae_server.detection.Evidence;
 import com.veritae.veritae_server.detection.NoFaceDetectedException;
 import com.veritae.veritae_server.detection.VideoDetectionClient;
+import com.veritae.veritae_server.detection.VideoDetectionResult;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.MediaType;
@@ -35,7 +35,7 @@ public class DfdcHttpDetectionClient implements VideoDetectionClient {
     }
 
     @Override
-    public AiDetectionResult detectVideo(byte[] videoBytes, String filename, String contentType) {
+    public VideoDetectionResult detectVideo(byte[] videoBytes, String filename, String contentType) {
         MultipartBodyBuilder builder = new MultipartBodyBuilder();
         builder.part("file", new ByteArrayResource(videoBytes) {
             @Override
@@ -59,7 +59,7 @@ public class DfdcHttpDetectionClient implements VideoDetectionClient {
             List<Evidence> evidence = response.aiDetection().evidence().stream()
                     .map(e -> new Evidence(e.title(), e.description(), e.tags(), e.startSec(), e.endSec()))
                     .toList();
-            return new AiDetectionResult(
+            return new VideoDetectionResult(
                     response.aiDetection().model(),
                     response.aiDetection().score(),
                     evidence,

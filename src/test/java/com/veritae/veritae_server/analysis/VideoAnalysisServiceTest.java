@@ -1,6 +1,6 @@
 package com.veritae.veritae_server.analysis;
 
-import com.veritae.veritae_server.detection.AiDetectionResult;
+import com.veritae.veritae_server.detection.VideoDetectionResult;
 import com.veritae.veritae_server.domain.analysisjob.AnalysisJob;
 import com.veritae.veritae_server.domain.analysisjob.AnalysisJobRepository;
 import com.veritae.veritae_server.domain.analysisjob.AnalysisJobStatus;
@@ -105,7 +105,7 @@ class VideoAnalysisServiceTest {
         // Given
         UUID memberId = UUID.randomUUID();
         AnalysisJob job = AnalysisJob.submit(memberId);
-        job.markCompleted(objectMapper.writeValueAsString(new AiDetectionResult("dfdc", 0.91, List.of(), null)));
+        job.markCompleted(objectMapper.writeValueAsString(new VideoDetectionResult("dfdc", 0.91, List.of(), null)));
         when(analysisJobRepository.findById(job.getId())).thenReturn(Optional.of(job));
 
         // When

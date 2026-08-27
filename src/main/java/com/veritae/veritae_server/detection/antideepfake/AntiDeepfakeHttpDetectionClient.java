@@ -1,8 +1,8 @@
 package com.veritae.veritae_server.detection.antideepfake;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.veritae.veritae_server.detection.AiDetectionResult;
 import com.veritae.veritae_server.detection.AudioDetectionClient;
+import com.veritae.veritae_server.detection.AudioDetectionResult;
 import com.veritae.veritae_server.detection.DetectionServiceException;
 import com.veritae.veritae_server.detection.Evidence;
 import lombok.RequiredArgsConstructor;
@@ -27,7 +27,7 @@ public class AntiDeepfakeHttpDetectionClient implements AudioDetectionClient {
     private final RestClient detectionRestClient;
 
     @Override
-    public AiDetectionResult detectAudio(byte[] audioBytes, String filename, String contentType) {
+    public AudioDetectionResult detectAudio(byte[] audioBytes, String filename, String contentType) {
         MultipartBodyBuilder builder = new MultipartBodyBuilder();
         builder.part("file", new ByteArrayResource(audioBytes) {
             @Override
@@ -51,7 +51,7 @@ public class AntiDeepfakeHttpDetectionClient implements AudioDetectionClient {
             List<Evidence> evidence = response.aiDetection().evidence().stream()
                     .map(e -> new Evidence(e.title(), e.description(), e.tags(), e.startSec(), e.endSec()))
                     .toList();
-            return new AiDetectionResult(response.aiDetection().model(), response.aiDetection().score(), evidence, null);
+            return new AudioDetectionResult(response.aiDetection().model(), response.aiDetection().score(), evidence);
         } catch (RestClientException e) {
             throw new DetectionServiceException("탐지 서버 호출에 실패했습니다: " + e.getMessage(), e);
         }

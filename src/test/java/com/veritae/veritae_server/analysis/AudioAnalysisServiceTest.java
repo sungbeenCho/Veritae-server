@@ -1,7 +1,7 @@
 package com.veritae.veritae_server.analysis;
 
-import com.veritae.veritae_server.detection.AiDetectionResult;
 import com.veritae.veritae_server.detection.AudioDetectionClient;
+import com.veritae.veritae_server.detection.AudioDetectionResult;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -33,10 +33,10 @@ class AudioAnalysisServiceTest {
         // Given
         var file = new MockMultipartFile("file", "test.wav", "audio/wav", "fake-bytes".getBytes());
         when(audioDetectionClient.detectAudio(file.getBytes(), "test.wav", "audio/wav"))
-                .thenReturn(new AiDetectionResult("antideepfake", 0.87, List.of(), null));
+                .thenReturn(new AudioDetectionResult("antideepfake", 0.87, List.of()));
 
         // When
-        AiDetectionResult result = audioAnalysisService.analyzeAudio(file);
+        AudioDetectionResult result = audioAnalysisService.analyzeAudio(file);
 
         // Then
         assertThat(result.model()).isEqualTo("antideepfake");

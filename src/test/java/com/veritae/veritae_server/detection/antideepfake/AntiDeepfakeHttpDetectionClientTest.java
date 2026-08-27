@@ -1,6 +1,6 @@
 package com.veritae.veritae_server.detection.antideepfake;
 
-import com.veritae.veritae_server.detection.AiDetectionResult;
+import com.veritae.veritae_server.detection.AudioDetectionResult;
 import com.veritae.veritae_server.detection.DetectionServiceException;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
@@ -35,7 +35,7 @@ class AntiDeepfakeHttpDetectionClientTest {
         AntiDeepfakeHttpDetectionClient client = new AntiDeepfakeHttpDetectionClient(builder.build());
 
         // When
-        AiDetectionResult result = client.detectAudio("fake-bytes".getBytes(), "test.wav", "audio/wav");
+        AudioDetectionResult result = client.detectAudio("fake-bytes".getBytes(), "test.wav", "audio/wav");
 
         // Then
         assertThat(result.model()).isEqualTo("antideepfake");

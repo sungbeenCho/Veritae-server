@@ -7,5 +7,5 @@ package com.veritae.veritae_server.detection;
  */
 public interface AudioDetectionClient {
 
-    AiDetectionResult detectAudio(byte[] audioBytes, String filename, String contentType);
+    AudioDetectionResult detectAudio(byte[] audioBytes, String filename, String contentType);
 }
