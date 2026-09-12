@@ -470,8 +470,7 @@ components:
       required: [model, score]
       description: >-
         이미지 AI 판독 결과. SPAI는 근거 카드(evidence)를 만들지 않아 그 필드는 없다.
-        evidenceImage는 히트맵 기능(설계 승인, 구현 보류 중)을 위해 예약된 필드 - 아직
-        미구현이라 항상 null.
+        evidenceImage는 SPAI의 attention 히트맵(원본 사진 위에 합성된 오버레이)이다.
       properties:
         model:
           type: string
@@ -490,8 +489,8 @@ components:
           type: string
           nullable: true
           description: >-
-            판독 근거 히트맵 이미지(base64 인코딩 PNG). 아직 미구현이라 항상 null(2026-08-27
-            기준) - 구현되면 얼굴/이미지의 어느 부분이 의심스러운지 시각적으로 보여줄 예정.
+            판독 근거 히트맵 이미지(base64 인코딩 PNG). 이미지의 어느 부분이 의심스러운지
+            시각적으로 보여준다(best-effort - 실패하면 null).
 
     AudioDetectionResult:
       type: object

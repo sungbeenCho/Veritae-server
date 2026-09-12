@@ -44,7 +44,10 @@ public class SpaiHttpDetectionClient implements DetectionClient {
             if (response == null || response.aiDetection() == null) {
                 throw new DetectionServiceException("탐지 서버 응답이 비어 있습니다.", null);
             }
-            return new ImageDetectionResult(response.aiDetection().model(), response.aiDetection().score(), null);
+            return new ImageDetectionResult(
+                    response.aiDetection().model(),
+                    response.aiDetection().score(),
+                    response.aiDetection().evidenceImage());
         } catch (RestClientException e) {
             throw new DetectionServiceException("탐지 서버 호출에 실패했습니다: " + e.getMessage(), e);
         }
@@ -53,6 +56,9 @@ public class SpaiHttpDetectionClient implements DetectionClient {
     private record SpaiResponse(@JsonProperty("ai_detection") AiDetection aiDetection) {
     }
 
-    private record AiDetection(String model, double score) {
+    private record AiDetection(
+            String model,
+            double score,
+            @JsonProperty("evidence_image") String evidenceImage) {
     }
 }
