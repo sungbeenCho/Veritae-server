@@ -45,6 +45,9 @@ public class AnalysisJob {
     @Column(name = "result_json", columnDefinition = "LONGTEXT")
     private String resultJson;
 
+    @Column(name = "error_code", length = 50)
+    private String errorCode;
+
     @Column(name = "error_message", length = 1000)
     private String errorMessage;
 
@@ -78,8 +81,9 @@ public class AnalysisJob {
         this.updatedAt = Instant.now();
     }
 
-    public void markFailed(String errorMessage) {
+    public void markFailed(String errorCode, String errorMessage) {
         this.status = AnalysisJobStatus.FAILED;
+        this.errorCode = errorCode;
         this.errorMessage = errorMessage;
         this.updatedAt = Instant.now();
     }

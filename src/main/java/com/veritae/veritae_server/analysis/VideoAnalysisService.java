@@ -61,7 +61,7 @@ public class VideoAnalysisService {
         VideoDetectionResult result = job.getStatus() == AnalysisJobStatus.COMPLETED
                 ? readResultJson(job.getResultJson())
                 : null;
-        return new AnalysisJobView(job.getId(), job.getStatus(), result, job.getErrorMessage());
+        return new AnalysisJobView(job.getId(), job.getStatus(), result, job.getErrorCode(), job.getErrorMessage());
     }
 
     private void validate(MultipartFile file) {

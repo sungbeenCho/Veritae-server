@@ -50,13 +50,13 @@ public class VideoAnalysisAsyncWorker {
             // 사용자에게도 원인을 구체적으로 알려준다(2026-08-27 - 예전엔 이것도 아래 catch(Exception)에
             // 묶여서 "영상 분석 중 오류가 발생했습니다"로만 나왔었음).
             log.info("영상 분석: 얼굴 미검출 jobId={}", jobId);
-            job.markFailed("영상에서 얼굴을 찾을 수 없습니다. 얼굴이 잘 보이는 영상으로 다시 시도해주세요.");
+            job.markFailed("NO_FACE_DETECTED", "영상에서 얼굴을 찾을 수 없습니다. 얼굴이 잘 보이는 영상으로 다시 시도해주세요.");
         } catch (Exception e) {
             // 탐지 서버(Python)가 던지는 원문 에러 메시지에는 내부 경로/traceback 일부가 섞여 나올 수 있어
             // 클라이언트(errorMessage)에 그대로 노출하지 않는다. 상세 원인은 로그에만 남기고,
             // 사용자에게는 일반화된 메시지만 전달한다.
             log.error("영상 분석 실패 jobId={}", jobId, e);
-            job.markFailed("영상 분석 중 오류가 발생했습니다.");
+            job.markFailed("ANALYSIS_FAILED", "영상 분석 중 오류가 발생했습니다.");
         }
         analysisJobRepository.save(job);
     }

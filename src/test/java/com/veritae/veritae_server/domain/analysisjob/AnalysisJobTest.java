@@ -41,12 +41,13 @@ class AnalysisJobTest {
     }
 
     @Test
-    void markFailed_shouldTransitionToFailedAndStoreErrorMessage() {
+    void markFailed_shouldTransitionToFailedAndStoreErrorCodeAndMessage() {
         AnalysisJob job = AnalysisJob.submit(UUID.randomUUID());
 
-        job.markFailed("탐지 서버 호출 실패");
+        job.markFailed("ANALYSIS_FAILED", "탐지 서버 호출 실패");
 
         assertThat(job.getStatus()).isEqualTo(AnalysisJobStatus.FAILED);
+        assertThat(job.getErrorCode()).isEqualTo("ANALYSIS_FAILED");
         assertThat(job.getErrorMessage()).isEqualTo("탐지 서버 호출 실패");
     }
 }

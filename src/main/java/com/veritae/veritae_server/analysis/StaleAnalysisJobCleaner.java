@@ -39,7 +39,7 @@ public class StaleAnalysisJobCleaner {
         log.warn("서버 재시작 직전 PENDING/PROCESSING 상태로 남아있던 영상 분석 job {}건을 FAILED로 정리합니다.",
                 staleJobs.size());
         for (AnalysisJob job : staleJobs) {
-            job.markFailed(STALE_JOB_ERROR_MESSAGE);
+            job.markFailed("ANALYSIS_FAILED", STALE_JOB_ERROR_MESSAGE);
         }
         analysisJobRepository.saveAll(staleJobs);
     }

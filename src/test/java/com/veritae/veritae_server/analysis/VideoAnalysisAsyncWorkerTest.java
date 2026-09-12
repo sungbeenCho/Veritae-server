@@ -73,6 +73,7 @@ class VideoAnalysisAsyncWorkerTest {
         verify(analysisJobRepository, org.mockito.Mockito.atLeastOnce()).save(jobCaptor.capture());
         AnalysisJob savedJob = jobCaptor.getValue();
         assertThat(savedJob.getStatus()).isEqualTo(AnalysisJobStatus.FAILED);
+        assertThat(savedJob.getErrorCode()).isEqualTo("ANALYSIS_FAILED");
         assertThat(savedJob.getErrorMessage()).isEqualTo("영상 분석 중 오류가 발생했습니다.");
     }
 
@@ -93,6 +94,7 @@ class VideoAnalysisAsyncWorkerTest {
         verify(analysisJobRepository, org.mockito.Mockito.atLeastOnce()).save(jobCaptor.capture());
         AnalysisJob savedJob = jobCaptor.getValue();
         assertThat(savedJob.getStatus()).isEqualTo(AnalysisJobStatus.FAILED);
+        assertThat(savedJob.getErrorCode()).isEqualTo("NO_FACE_DETECTED");
         assertThat(savedJob.getErrorMessage())
                 .isEqualTo("영상에서 얼굴을 찾을 수 없습니다. 얼굴이 잘 보이는 영상으로 다시 시도해주세요.");
     }

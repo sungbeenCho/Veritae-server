@@ -40,6 +40,7 @@ public final class AnalysisApiMapper {
         var status = AnalysisJobResponse.StatusEnum.fromValue(view.status().name());
         return new AnalysisJobResponse(view.jobId(), status)
                 .aiDetection(aiDetection)
+                .errorCode(view.errorCode())
                 .errorMessage(view.errorMessage());
     }
 

@@ -55,6 +55,7 @@ class StaleAnalysisJobCleanerTest {
         assertThat(savedJobs).hasSize(2);
         assertThat(savedJobs).allSatisfy(job -> {
             assertThat(job.getStatus()).isEqualTo(AnalysisJobStatus.FAILED);
+            assertThat(job.getErrorCode()).isEqualTo("ANALYSIS_FAILED");
             assertThat(job.getErrorMessage()).isEqualTo("서버 재시작으로 처리가 중단됐습니다.");
         });
     }

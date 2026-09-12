@@ -10,5 +10,6 @@ import java.util.UUID;
  * VideoAnalysisService가 역직렬화해서 넣어준다 - AnalysisJob 엔티티 자체는 JSON
  * 역직렬화 책임을 모른다).
  */
-public record AnalysisJobView(UUID jobId, AnalysisJobStatus status, VideoDetectionResult result, String errorMessage) {
+public record AnalysisJobView(
+        UUID jobId, AnalysisJobStatus status, VideoDetectionResult result, String errorCode, String errorMessage) {
 }
