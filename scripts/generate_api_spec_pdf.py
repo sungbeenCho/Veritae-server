@@ -429,7 +429,7 @@ pdf.endpoint(
         "  }",
         "}",
     ],
-    resp_note="evidenceImage: 판독 근거 히트맵(base64 PNG). 히트맵 기능은 설계만 승인되고 구현 보류 중이라 현재는 항상 null.",
+    resp_note="evidenceImage: 판독 근거 히트맵(base64 PNG). 이미지의 어느 부분이 의심스러운지 시각적으로 보여준다(best-effort - 실패하면 null).",
     status_codes=[
         "200 OK",
         "400 Bad Request (빈 파일/지원하지 않는 형식)",
