@@ -4,6 +4,9 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.veritae.veritae_server.detection.DetectionServiceException;
 import com.veritae.veritae_server.detection.Evidence;
 import com.veritae.veritae_server.detection.NoFaceDetectedException;
+import com.veritae.veritae_server.detection.ScamDetectionResult;
+import com.veritae.veritae_server.detection.ScamEvidence;
+import com.veritae.veritae_server.detection.VideoAnalysisResult;
 import com.veritae.veritae_server.detection.VideoDetectionClient;
 import com.veritae.veritae_server.detection.VideoDetectionResult;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -35,7 +38,7 @@ public class DfdcHttpDetectionClient implements VideoDetectionClient {
     }
 
     @Override
-    public VideoDetectionResult detectVideo(byte[] videoBytes, String filename, String contentType) {
+    public VideoAnalysisResult detectVideo(byte[] videoBytes, String filename, String contentType) {
         MultipartBodyBuilder builder = new MultipartBodyBuilder();
         builder.part("file", new ByteArrayResource(videoBytes) {
             @Override
@@ -59,11 +62,12 @@ public class DfdcHttpDetectionClient implements VideoDetectionClient {
             List<Evidence> evidence = response.aiDetection().evidence().stream()
                     .map(e -> new Evidence(e.title(), e.description(), e.tags(), e.startSec(), e.endSec()))
                     .toList();
-            return new VideoDetectionResult(
+            var aiDetection = new VideoDetectionResult(
                     response.aiDetection().model(),
                     response.aiDetection().score(),
                     evidence,
                     response.aiDetection().evidenceImage());
+            return new VideoAnalysisResult(aiDetection, toScamDetection(response.scamDetection()));
         } catch (RestClientResponseException e) {
             // 422는 탐지 서버가 "얼굴을 못 찾음"을 명시적으로 알려주는 정상적인 사용자 케이스라,
             // 그 외 상태코드(장애성)와 구분해서 전용 예외로 던진다(2026-08-27).
@@ -76,7 +80,19 @@ public class DfdcHttpDetectionClient implements VideoDetectionClient {
         }
     }
 
-    private record DfdcResponse(@JsonProperty("ai_detection") AiDetection aiDetection) {
+    private ScamDetectionResult toScamDetection(ScamDetectionDto dto) {
+        if (dto == null) {
+            return null;
+        }
+        List<ScamEvidence> evidence = dto.evidence().stream()
+                .map(e -> new ScamEvidence(e.sentence(), e.score()))
+                .toList();
+        return new ScamDetectionResult(dto.model(), dto.score(), evidence);
+    }
+
+    private record DfdcResponse(
+            @JsonProperty("ai_detection") AiDetection aiDetection,
+            @JsonProperty("scam_detection") ScamDetectionDto scamDetection) {
     }
 
     private record AiDetection(
@@ -92,5 +108,11 @@ public class DfdcHttpDetectionClient implements VideoDetectionClient {
             List<String> tags,
             @JsonProperty("start_sec") double startSec,
             @JsonProperty("end_sec") double endSec) {
+    }
+
+    private record ScamDetectionDto(String model, double score, List<ScamEvidenceDto> evidence) {
+    }
+
+    private record ScamEvidenceDto(String sentence, double score) {
     }
 }

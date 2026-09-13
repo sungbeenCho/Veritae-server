@@ -8,5 +8,5 @@ package com.veritae.veritae_server.detection;
  */
 public interface VideoDetectionClient {
 
-    VideoDetectionResult detectVideo(byte[] videoBytes, String filename, String contentType);
+    VideoAnalysisResult detectVideo(byte[] videoBytes, String filename, String contentType);
 }
