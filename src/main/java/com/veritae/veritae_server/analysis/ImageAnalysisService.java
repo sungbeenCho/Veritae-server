@@ -1,7 +1,7 @@
 package com.veritae.veritae_server.analysis;
 
 import com.veritae.veritae_server.detection.DetectionClient;
-import com.veritae.veritae_server.detection.ImageDetectionResult;
+import com.veritae.veritae_server.detection.ImageAnalysisResult;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
@@ -18,7 +18,7 @@ public class ImageAnalysisService {
 
     private final DetectionClient detectionClient;
 
-    public ImageDetectionResult analyzeImage(MultipartFile file) {
+    public ImageAnalysisResult analyzeImage(MultipartFile file) {
         validate(file);
         try {
             return detectionClient.detectImage(file.getBytes(), file.getOriginalFilename(), file.getContentType());
