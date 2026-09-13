@@ -26,7 +26,7 @@
 
 이미지/음성은 동기 응답이라, `scamDetection` 계산(OCR/STT+Lilju)을 AI판독 뒤에 순차로 붙이면 응답시간이 늘어난다. 특히 음성은 이미 AntiDeepfake 자체가 2.6분 파일 기준 89~106초가 걸려 `read-timeout`을 300초로 늘려둔 상태라, STT까지 순차로 얹으면 타임아웃 재발 위험이 있다.
 
-**결정:** 각 엔드포인트에서 AI판독 모델 호출과 텍스트추출+사기감지 파이프라인 호출을 **병렬로 실행**한다(서로 의존관계 없는 독립 연산이므로). Spring 서비스 레이어에서 `CompletableFuture` 등으로 동시에 실행 후 join. 이렇게 하면 전체 응답시간이 두 소요시간의 합이 아니라 더 느린 쪽 기준이 된다.
+**결정:** AI판독 모델 호출과 텍스트추출+사기감지 파이프라인 호출을 **병렬로 실행**한다(서로 의존관계 없는 독립 연산이므로). **병렬화는 데스크톱 Python 서버(`/process/image` 등) 내부에서 일어난다** — 그 요청 하나 안에서 SPAI(또는 AntiDeepfake/dfdc) subprocess와 OCR/STT+Lilju subprocess를 동시에 실행하고, 완료되면 하나의 JSON 응답에 `ai_detection`/`scam_detection`을 같이 담아 돌려준다. Spring 쪽은 지금처럼 엔드포인트 하나에 HTTP 요청 하나만 보내고, 그 응답에서 두 필드를 같이 파싱하기만 하면 된다 — Spring 서비스 레이어에 별도 병렬화 로직(`CompletableFuture` 등)은 필요 없다. (초안에서는 "Spring 레이어에서 병렬화"로 잘못 적었었는데, 그러면 파일을 두 엔드포인트에 두 번 업로드해야 하고 SPAI/AntiDeepfake/dfdc subprocess가 중복 실행돼 GPU 자원도 낭비되므로 데스크톱 내부 병렬화로 정정함.) 이렇게 하면 전체 응답시간이 두 소요시간의 합이 아니라 더 느린 쪽 기준이 된다.
 
 영상은 이미 비동기(job+폴링) 구조라 이 문제 자체가 없다 — 그대로 job 처리 로직 안에 사기감지 단계를 추가하면 된다.
 
@@ -70,9 +70,18 @@
 
 ## 7. Spring 쪽 구조
 
-기존 `DetectionClient` 패턴을 재사용한다 — `FraudDetectionClient`(가칭) 인터페이스를 새로 만들고, 데스크톱의 확장된 `/process/image`, `/process/audio`, `/process/video` 응답에서 `scam_detection` 필드를 파싱하는 구현체를 둔다. 나중에 모델 교체가 필요해져도(라이선스 문제 등) 호출부(서비스/컨트롤러) 코드는 안 건드리고 구현체만 교체 가능.
+**별도 `FraudDetectionClient` 인터페이스나 별도 HTTP 호출을 새로 만들지 않는다.** 2-1절 정정과 마찬가지로, 데스크톱이 이미 `ai_detection`+`scam_detection`을 한 응답에 같이 담아 보내주므로, 기존 `DetectionClient`/`AudioDetectionClient`/`VideoDetectionClient` 세 인터페이스의 반환 타입만 확장한다.
 
-`ImageDetectionResult`/`AudioDetectionResult`/`VideoDetectionResult` 각각에 `ScamDetectionResult(model, score, evidence)` 타입의 nullable 필드를 추가한다(정확한 필드명은 구현 단계에서 기존 네이밍 컨벤션에 맞춰 확정).
+- 새 도메인 타입: `ScamDetectionResult(String model, double score, List<ScamEvidence> evidence)`, `ScamEvidence(String sentence, double score)` — 기존 `Evidence`(title/description/tags/시간구간)와 달리 문장 원문+점수만 담는 별도의 단순한 타입(5절).
+- `ImageDetectionResult`/`AudioDetectionResult`/`VideoDetectionResult`(기존, AI판독 전용) 자체는 그대로 두고 건드리지 않는다 — `scamDetection`은 이 타입들 **안에 중첩되지 않고, 2절에서 정한 대로 응답 최상위에서 `aiDetection`과 나란한 형제 필드**가 되어야 하기 때문이다.
+- 대신 각 클라이언트 인터페이스의 메서드 반환 타입을 다음과 같은 새 조합 타입으로 바꾼다 (메서드 시그니처/이름은 유지):
+  - `DetectionClient.detectImage(...)` → `ImageAnalysisResult(ImageDetectionResult aiDetection, ScamDetectionResult scamDetection)`
+  - `AudioDetectionClient.detectAudio(...)` → `AudioAnalysisResult(AudioDetectionResult aiDetection, ScamDetectionResult scamDetection)`
+  - `VideoDetectionClient.detectVideo(...)` → `VideoAnalysisResult(VideoDetectionResult aiDetection, ScamDetectionResult scamDetection)`
+  - (`scamDetection`은 전부 nullable — 텍스트가 추출되지 않으면 null.)
+- 각 구현체(`SpaiHttpDetectionClient`, `AntiDeepfakeHttpDetectionClient`, `DfdcHttpDetectionClient`)는 여전히 HTTP 호출을 한 번만 하고, 그 한 응답에서 `ai_detection`과 `scam_detection` 두 필드를 같이 파싱해서 위 조합 타입을 반환한다.
+- 이 변경은 `ImageAnalysisService`/`AudioAnalysisService`/`VideoAnalysisAsyncWorker`(반환/저장 타입 변경), `AnalysisApiMapper`(응답 조립 시 두 필드를 함께 매핑), `AnalysisJobView`(영상 job 조회 응답도 scamDetection을 함께 실어야 함), `openapi.yaml`(`ImageAnalysisResponse`/`AudioAnalysisResponse`/`AnalysisJobResponse`에 `scamDetection` 필드 추가, `ScamDetectionResult`/`ScamEvidence` 스키마 신설)까지 이어진다.
+- 나중에 모델 교체가 필요해져도(라이선스 문제 등) 데스크톱 응답 파싱 로직(구현체)만 바꾸면 되고, 호출부(서비스/컨트롤러) 코드는 그대로 유지된다 — 기존 `DetectionClient` 패턴이 주는 이점 그대로 유지.
 
 ## 8. 아직 안 정해진 것
 
