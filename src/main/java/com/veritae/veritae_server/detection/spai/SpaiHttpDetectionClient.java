@@ -3,7 +3,10 @@ package com.veritae.veritae_server.detection.spai;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.veritae.veritae_server.detection.DetectionClient;
 import com.veritae.veritae_server.detection.DetectionServiceException;
+import com.veritae.veritae_server.detection.ImageAnalysisResult;
 import com.veritae.veritae_server.detection.ImageDetectionResult;
+import com.veritae.veritae_server.detection.ScamDetectionResult;
+import com.veritae.veritae_server.detection.ScamEvidence;
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.MediaType;
@@ -12,10 +15,13 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 
+import java.util.List;
+
 /**
  * {@link DetectionClient} 의 SPAI(셀프호스팅) 구현체. 탐지 서버(veritae-detection-server,
- * 3060Ti 데스크탑)의 POST /process/image 를 호출한다. 응답 스키마는 그 레포의
- * app/schemas.py 와 일치해야 한다(snake_case ai_detection 필드).
+ * 3060Ti 데스크탑)의 POST /process/image 를 호출한다. 이미지 판독(SPAI)과 사기감지
+ * (Lilju)를 데스크탑이 내부적으로 병렬 실행해 한 응답에 ai_detection/scam_detection을
+ * 같이 담아 보내므로, HTTP 호출은 지금처럼 한 번만 한다(2026-09-13).
  */
 @Component
 @RequiredArgsConstructor
@@ -24,7 +30,7 @@ public class SpaiHttpDetectionClient implements DetectionClient {
     private final RestClient detectionRestClient;
 
     @Override
-    public ImageDetectionResult detectImage(byte[] imageBytes, String filename, String contentType) {
+    public ImageAnalysisResult detectImage(byte[] imageBytes, String filename, String contentType) {
         MultipartBodyBuilder builder = new MultipartBodyBuilder();
         builder.part("file", new ByteArrayResource(imageBytes) {
             @Override
@@ -44,21 +50,40 @@ public class SpaiHttpDetectionClient implements DetectionClient {
             if (response == null || response.aiDetection() == null) {
                 throw new DetectionServiceException("탐지 서버 응답이 비어 있습니다.", null);
             }
-            return new ImageDetectionResult(
+            var aiDetection = new ImageDetectionResult(
                     response.aiDetection().model(),
                     response.aiDetection().score(),
                     response.aiDetection().evidenceImage());
+            return new ImageAnalysisResult(aiDetection, toScamDetection(response.scamDetection()));
         } catch (RestClientException e) {
             throw new DetectionServiceException("탐지 서버 호출에 실패했습니다: " + e.getMessage(), e);
         }
     }
 
-    private record SpaiResponse(@JsonProperty("ai_detection") AiDetection aiDetection) {
+    private ScamDetectionResult toScamDetection(ScamDetectionDto dto) {
+        if (dto == null) {
+            return null;
+        }
+        List<ScamEvidence> evidence = dto.evidence().stream()
+                .map(e -> new ScamEvidence(e.sentence(), e.score()))
+                .toList();
+        return new ScamDetectionResult(dto.model(), dto.score(), evidence);
+    }
+
+    private record SpaiResponse(
+            @JsonProperty("ai_detection") AiDetection aiDetection,
+            @JsonProperty("scam_detection") ScamDetectionDto scamDetection) {
     }
 
     private record AiDetection(
             String model,
             double score,
             @JsonProperty("evidence_image") String evidenceImage) {
+    }
+
+    private record ScamDetectionDto(String model, double score, List<ScamEvidenceDto> evidence) {
+    }
+
+    private record ScamEvidenceDto(String sentence, double score) {
     }
 }
