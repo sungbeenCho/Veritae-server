@@ -10,6 +10,7 @@
 **확정된 전제:**
 - LLM 사용 금지(`feedback_no_llm`), 룰/키워드 기반 엔진도 사용자가 명시적으로 거절함(`feedback_rule_based_fraud_detection_rejected`) — 대신 기존에 학습된 오픈 모델을 그대로 갖다 쓴다.
 - 분류 모델: `Lilju/voicephishing_kobert` (KoBERT 파인튜닝, 이진분류, label 1=피싱). 라이선스 미기재 리스크는 비상업/개인 프로젝트라는 이유로 사용자가 감수하기로 결정함(2026-09-13).
+  - **재검토 완료 (2026-09-13, 같은 날 재확인):** 모델 저장소(LICENSE 없음, 모델카드 없음), 업로더 프로필, 업로더가 만든 데모 Space(`Lilju/voicephishing_detection`)의 `app.py`/`README.md`, Discussions 탭까지 전부 직접 확인했으나 라이선스·학습데이터 출처에 대한 정보가 어디에도 없음을 재확인함. 새로 확인된 사실: 베이스 모델인 SKT KoBERT는 GitHub(`SKTBrain/KoBERT`) 기준 Apache-2.0이나(`gh api`로 확인), 이는 베이스 아키텍처/사전학습 가중치에만 해당하고 `Lilju`가 보이스피싱 데이터로 파인튜닝한 이 가중치 자체의 라이선스·데이터 출처 문제를 해결해주지 않음. 리스크 성격은 최초 결정 시점과 동일 — 사용자가 이 재검토 결과를 인지한 상태로 그대로 진행하기로 재확인함(2026-09-13).
 - 텍스트 추출: 이미지는 **PaddleOCR**, 음성/영상(오디오 트랙)은 **faster-whisper**.
 - 상세 분석 결과에는 AI판독 이유 + 사기감지 이유가 **둘 다** 반드시 포함되어야 한다 (`project_veritae_analysis_reasoning_requirement`, 반복 강조된 하드 요구사항).
 
