@@ -1,6 +1,6 @@
 package com.veritae.veritae_server.analysis;
 
-import com.veritae.veritae_server.detection.VideoDetectionResult;
+import com.veritae.veritae_server.detection.VideoAnalysisResult;
 import com.veritae.veritae_server.domain.analysisjob.AnalysisJobStatus;
 
 import java.util.UUID;
@@ -11,5 +11,5 @@ import java.util.UUID;
  * 역직렬화 책임을 모른다).
  */
 public record AnalysisJobView(
-        UUID jobId, AnalysisJobStatus status, VideoDetectionResult result, String errorCode, String errorMessage) {
+        UUID jobId, AnalysisJobStatus status, VideoAnalysisResult result, String errorCode, String errorMessage) {
 }

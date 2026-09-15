@@ -3,8 +3,8 @@ package com.veritae.veritae_server.analysis;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.veritae.veritae_server.detection.NoFaceDetectedException;
+import com.veritae.veritae_server.detection.VideoAnalysisResult;
 import com.veritae.veritae_server.detection.VideoDetectionClient;
-import com.veritae.veritae_server.detection.VideoDetectionResult;
 import com.veritae.veritae_server.domain.analysisjob.AnalysisJob;
 import com.veritae.veritae_server.domain.analysisjob.AnalysisJobRepository;
 import lombok.RequiredArgsConstructor;
@@ -43,7 +43,7 @@ public class VideoAnalysisAsyncWorker {
         analysisJobRepository.save(job);
 
         try {
-            VideoDetectionResult result = videoDetectionClient.detectVideo(videoBytes, filename, contentType);
+            VideoAnalysisResult result = videoDetectionClient.detectVideo(videoBytes, filename, contentType);
             job.markCompleted(writeResultJson(result));
         } catch (NoFaceDetectedException e) {
             // 얼굴 없음은 진짜 장애가 아니라 정상적인 사용자 케이스라 error가 아니라 info로 남기고,
@@ -61,7 +61,7 @@ public class VideoAnalysisAsyncWorker {
         analysisJobRepository.save(job);
     }
 
-    private String writeResultJson(VideoDetectionResult result) {
+    private String writeResultJson(VideoAnalysisResult result) {
         try {
             return OBJECT_MAPPER.writeValueAsString(result);
         } catch (JsonProcessingException e) {

@@ -1,5 +1,6 @@
 package com.veritae.veritae_server.analysis;
 
+import com.veritae.veritae_server.detection.VideoAnalysisResult;
 import com.veritae.veritae_server.detection.VideoDetectionResult;
 import com.veritae.veritae_server.domain.analysisjob.AnalysisJob;
 import com.veritae.veritae_server.domain.analysisjob.AnalysisJobRepository;
@@ -105,7 +106,8 @@ class VideoAnalysisServiceTest {
         // Given
         UUID memberId = UUID.randomUUID();
         AnalysisJob job = AnalysisJob.submit(memberId);
-        job.markCompleted(objectMapper.writeValueAsString(new VideoDetectionResult("dfdc", 0.91, List.of(), null)));
+        job.markCompleted(objectMapper.writeValueAsString(
+                new VideoAnalysisResult(new VideoDetectionResult("dfdc", 0.91, List.of(), null), null)));
         when(analysisJobRepository.findById(job.getId())).thenReturn(Optional.of(job));
 
         // When
@@ -113,8 +115,8 @@ class VideoAnalysisServiceTest {
 
         // Then
         assertThat(view.status()).isEqualTo(AnalysisJobStatus.COMPLETED);
-        assertThat(view.result().model()).isEqualTo("dfdc");
-        assertThat(view.result().score()).isEqualTo(0.91);
+        assertThat(view.result().aiDetection().model()).isEqualTo("dfdc");
+        assertThat(view.result().aiDetection().score()).isEqualTo(0.91);
         assertThat(view.errorMessage()).isNull();
     }
 
