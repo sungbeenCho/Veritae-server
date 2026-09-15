@@ -3,9 +3,14 @@ package com.veritae.veritae_server.api;
 import com.veritae.veritae_server.analysis.AudioAnalysisService;
 import com.veritae.veritae_server.analysis.ImageAnalysisService;
 import com.veritae.veritae_server.auth.jwt.JwtTokenProvider;
+import com.veritae.veritae_server.detection.AudioAnalysisResult;
 import com.veritae.veritae_server.detection.AudioDetectionResult;
 import com.veritae.veritae_server.detection.Evidence;
+import com.veritae.veritae_server.detection.ImageAnalysisResult;
 import com.veritae.veritae_server.detection.ImageDetectionResult;
+import com.veritae.veritae_server.detection.ScamDetectionResult;
+import com.veritae.veritae_server.detection.ScamEvidence;
+import com.veritae.veritae_server.detection.VideoAnalysisResult;
 import com.veritae.veritae_server.detection.VideoDetectionResult;
 import com.veritae.veritae_server.openapi.api.AnalysisApiController;
 import com.veritae.veritae_server.security.ProblemDetailAuthenticationEntryPoint;
@@ -55,12 +60,28 @@ class AnalysisApiControllerTest {
     @WithMockUser
     void analyzeImage_withAuthenticatedMemberAndValidFile_shouldReturn200WithScore() throws Exception {
         var file = new MockMultipartFile("file", "test.jpg", "image/jpeg", "fake-bytes".getBytes());
-        when(imageAnalysisService.analyzeImage(any())).thenReturn(new ImageDetectionResult("spai", 0.87, null));
+        when(imageAnalysisService.analyzeImage(any()))
+                .thenReturn(new ImageAnalysisResult(new ImageDetectionResult("spai", 0.87, null), null));
 
         mockMvc.perform(multipart("/api/v1/analysis/image").file(file))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.aiDetection.model").value("spai"))
                 .andExpect(jsonPath("$.aiDetection.score").value(0.87));
+    }
+
+    @Test
+    @WithMockUser
+    void analyzeImage_withScamDetection_shouldIncludeScamDetectionInResponse() throws Exception {
+        var file = new MockMultipartFile("file", "test.jpg", "image/jpeg", "fake-bytes".getBytes());
+        var scamDetection = new ScamDetectionResult("lilju", 0.82, List.of(new ScamEvidence("계좌번호를 알려주세요", 0.95)));
+        when(imageAnalysisService.analyzeImage(any()))
+                .thenReturn(new ImageAnalysisResult(new ImageDetectionResult("spai", 0.87, null), scamDetection));
+
+        mockMvc.perform(multipart("/api/v1/analysis/image").file(file))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.scamDetection.model").value("lilju"))
+                .andExpect(jsonPath("$.scamDetection.score").value(0.82))
+                .andExpect(jsonPath("$.scamDetection.evidence[0].sentence").value("계좌번호를 알려주세요"));
     }
 
     @Test
@@ -74,7 +95,8 @@ class AnalysisApiControllerTest {
         // 운영 환경에서 실제 HTTP 요청 시에는 서블릿 컨테이너가 이 설정을 적용한다.
         byte[] largeContent = new byte[5 * 1024 * 1024]; // 5MB > Spring Boot 기본 max-file-size(1MB)
         var file = new MockMultipartFile("file", "test.jpg", "image/jpeg", largeContent);
-        when(imageAnalysisService.analyzeImage(any())).thenReturn(new ImageDetectionResult("spai", 0.87, null));
+        when(imageAnalysisService.analyzeImage(any()))
+                .thenReturn(new ImageAnalysisResult(new ImageDetectionResult("spai", 0.87, null), null));
 
         mockMvc.perform(multipart("/api/v1/analysis/image").file(file))
                 .andExpect(status().isOk());
@@ -92,11 +114,11 @@ class AnalysisApiControllerTest {
     @WithMockUser
     void analyzeAudio_withAuthenticatedMemberAndValidFile_shouldReturn200WithScoreAndEvidence() throws Exception {
         var file = new MockMultipartFile("file", "test.wav", "audio/wav", "fake-bytes".getBytes());
-        when(audioAnalysisService.analyzeAudio(any())).thenReturn(new AudioDetectionResult(
+        when(audioAnalysisService.analyzeAudio(any())).thenReturn(new AudioAnalysisResult(new AudioDetectionResult(
                 "antideepfake", 0.87,
                 List.of(new Evidence(
                         "시간 구간 이상 패턴", "0.5초~1.2초 구간에서 합성 흔적이 감지됨",
-                        List.of("temporal"), 0.5, 1.2))));
+                        List.of("temporal"), 0.5, 1.2))), null));
 
         mockMvc.perform(multipart("/api/v1/analysis/audio").file(file))
                 .andExpect(status().isOk())
@@ -146,10 +168,10 @@ class AnalysisApiControllerTest {
                 new com.veritae.veritae_server.analysis.AnalysisJobView(
                         jobId,
                         com.veritae.veritae_server.domain.analysisjob.AnalysisJobStatus.COMPLETED,
-                        new VideoDetectionResult("dfdc", 0.91,
+                        new VideoAnalysisResult(new VideoDetectionResult("dfdc", 0.91,
                                 List.of(new Evidence("얼굴 조작 의심 구간", "3.0초~7.0초 구간에서 얼굴 합성 흔적이 감지됨",
                                         List.of("temporal", "face-swap"), 3.0, 7.0)),
-                                "base64pngdata"),
+                                "base64pngdata"), null),
                         null,
                         null));
 

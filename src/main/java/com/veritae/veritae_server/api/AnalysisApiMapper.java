@@ -1,14 +1,16 @@
 package com.veritae.veritae_server.api;
 
 import com.veritae.veritae_server.analysis.AnalysisJobView;
-import com.veritae.veritae_server.detection.AudioDetectionResult;
-import com.veritae.veritae_server.detection.ImageDetectionResult;
+import com.veritae.veritae_server.detection.AudioAnalysisResult;
+import com.veritae.veritae_server.detection.ImageAnalysisResult;
+import com.veritae.veritae_server.detection.VideoAnalysisResult;
 import com.veritae.veritae_server.detection.VideoDetectionResult;
 import com.veritae.veritae_server.openapi.model.AnalysisJobAcceptedResponse;
 import com.veritae.veritae_server.openapi.model.AnalysisJobResponse;
 import com.veritae.veritae_server.openapi.model.AudioAnalysisResponse;
 import com.veritae.veritae_server.openapi.model.Evidence;
 import com.veritae.veritae_server.openapi.model.ImageAnalysisResponse;
+import com.veritae.veritae_server.openapi.model.ScamEvidence;
 
 import java.util.List;
 import java.util.UUID;
@@ -18,17 +20,19 @@ public final class AnalysisApiMapper {
     private AnalysisApiMapper() {
     }
 
-    public static ImageAnalysisResponse toResponse(ImageDetectionResult result) {
+    public static ImageAnalysisResponse toResponse(ImageAnalysisResult result) {
         var openApiResult = new com.veritae.veritae_server.openapi.model.ImageDetectionResult(
-                result.model(), result.score())
-                .evidenceImage(result.evidenceImage());
-        return new ImageAnalysisResponse(openApiResult);
+                result.aiDetection().model(), result.aiDetection().score())
+                .evidenceImage(result.aiDetection().evidenceImage());
+        return new ImageAnalysisResponse(openApiResult)
+                .scamDetection(toOpenApiScamDetection(result.scamDetection()));
     }
 
-    public static AudioAnalysisResponse toAudioResponse(AudioDetectionResult result) {
+    public static AudioAnalysisResponse toAudioResponse(AudioAnalysisResult result) {
         var openApiResult = new com.veritae.veritae_server.openapi.model.AudioDetectionResult(
-                result.model(), result.score(), toOpenApiEvidence(result.evidence()));
-        return new AudioAnalysisResponse(openApiResult);
+                result.aiDetection().model(), result.aiDetection().score(), toOpenApiEvidence(result.aiDetection().evidence()));
+        return new AudioAnalysisResponse(openApiResult)
+                .scamDetection(toOpenApiScamDetection(result.scamDetection()));
     }
 
     public static AnalysisJobAcceptedResponse toJobAcceptedResponse(UUID jobId) {
@@ -36,10 +40,13 @@ public final class AnalysisApiMapper {
     }
 
     public static AnalysisJobResponse toJobResponse(AnalysisJobView view) {
-        var aiDetection = view.result() != null ? toOpenApiResult(view.result()) : null;
+        VideoAnalysisResult result = view.result();
+        var aiDetection = result != null ? toOpenApiResult(result.aiDetection()) : null;
+        var scamDetection = result != null ? toOpenApiScamDetection(result.scamDetection()) : null;
         var status = AnalysisJobResponse.StatusEnum.fromValue(view.status().name());
         return new AnalysisJobResponse(view.jobId(), status)
                 .aiDetection(aiDetection)
+                .scamDetection(scamDetection)
                 .errorCode(view.errorCode())
                 .errorMessage(view.errorMessage());
     }
@@ -48,6 +55,18 @@ public final class AnalysisApiMapper {
         return new com.veritae.veritae_server.openapi.model.VideoDetectionResult(
                 result.model(), result.score(), toOpenApiEvidence(result.evidence()))
                 .evidenceImage(result.evidenceImage());
+    }
+
+    private static com.veritae.veritae_server.openapi.model.ScamDetectionResult toOpenApiScamDetection(
+            com.veritae.veritae_server.detection.ScamDetectionResult scamDetection) {
+        if (scamDetection == null) {
+            return null;
+        }
+        List<ScamEvidence> evidence = scamDetection.evidence().stream()
+                .map(e -> new ScamEvidence(e.sentence(), e.score()))
+                .toList();
+        return new com.veritae.veritae_server.openapi.model.ScamDetectionResult(
+                scamDetection.model(), scamDetection.score(), evidence);
     }
 
     private static List<Evidence> toOpenApiEvidence(List<com.veritae.veritae_server.detection.Evidence> evidence) {
