@@ -440,6 +440,11 @@ components:
       properties:
         aiDetection:
           $ref: '#/components/schemas/ImageDetectionResult'
+        scamDetection:
+          allOf:
+            - $ref: '#/components/schemas/ScamDetectionResult'
+          nullable: true
+          description: 사기(보이스피싱 등) 위험도 판독 결과. 텍스트가 전혀 추출되지 않으면 없음(null).
 
     AudioAnalysisResponse:
       type: object
@@ -447,6 +452,11 @@ components:
       properties:
         aiDetection:
           $ref: '#/components/schemas/AudioDetectionResult'
+        scamDetection:
+          allOf:
+            - $ref: '#/components/schemas/ScamDetectionResult'
+          nullable: true
+          description: 사기(보이스피싱 등) 위험도 판독 결과. 텍스트가 전혀 추출되지 않으면 없음(null).
 
     AnalysisJobAcceptedResponse:
       type: object
@@ -479,6 +489,11 @@ components:
             - $ref: '#/components/schemas/VideoDetectionResult'
           nullable: true
           description: status가 COMPLETED일 때만 채워진다.
+        scamDetection:
+          allOf:
+            - $ref: '#/components/schemas/ScamDetectionResult'
+          nullable: true
+          description: status가 COMPLETED이고 텍스트가 추출됐을 때만 채워진다.
         errorCode:
           type: string
           nullable: true
@@ -574,6 +589,52 @@ components:
           description: >-
             판독 근거 히트맵 이미지(base64 인코딩 PNG). 얼굴의 어느 부분이 의심스러운지
             시각적으로 보여준다(best-effort - 실패하면 null).
+
+    ScamDetectionResult:
+      type: object
+      required: [model, score, evidence]
+      description: 사기(보이스피싱 등) 위험도 판독 결과. 텍스트가 전혀 추출되지 않으면 이 필드 자체가 없다(null).
+      properties:
+        model:
+          type: string
+          nullable: false
+          description: 사기감지에 사용된 모델 이름.
+          example: lilju
+        score:
+          type: number
+          format: double
+          nullable: false
+          minimum: 0
+          maximum: 1
+          description: 사기(보이스피싱 등)일 위험도(0~1). 문장별 확률의 최댓값x0.7 + 평균x0.3으로 집계.
+          example: 0.82
+        evidence:
+          type: array
+          nullable: false
+          description: 위험하다고 판단된 문장 근거 카드 목록(개별 확률 0.5 이상만 포함). 근거가 없으면 빈 배열.
+          items:
+            $ref: '#/components/schemas/ScamEvidence'
+
+    ScamEvidence:
+      type: object
+      required: [sentence, score]
+      description: >-
+        사기감지 근거 카드 한 장. 위험 문장 원문과 그 문장의 개별 확률만 담는다 - 유형
+        라벨(예: 기관사칭)은 룰 기반 분류가 필요해 포함하지 않는다.
+      properties:
+        sentence:
+          type: string
+          nullable: false
+          description: 위험하다고 판단된 문장 원문.
+          example: 지금 바로 계좌번호와 비밀번호를 알려주셔야 합니다.
+        score:
+          type: number
+          format: double
+          nullable: false
+          minimum: 0
+          maximum: 1
+          description: 이 문장이 사기(보이스피싱 등)일 확률(0~1).
+          example: 0.95
 
     Evidence:
       type: object
