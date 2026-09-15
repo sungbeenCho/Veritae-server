@@ -6,8 +6,7 @@ import com.veritae.veritae_server.detection.AudioDetectionClient;
 import com.veritae.veritae_server.detection.AudioDetectionResult;
 import com.veritae.veritae_server.detection.DetectionServiceException;
 import com.veritae.veritae_server.detection.Evidence;
-import com.veritae.veritae_server.detection.ScamDetectionResult;
-import com.veritae.veritae_server.detection.ScamEvidence;
+import com.veritae.veritae_server.detection.ScamDetectionJson;
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.MediaType;
@@ -58,25 +57,15 @@ public class AntiDeepfakeHttpDetectionClient implements AudioDetectionClient {
                     .map(e -> new Evidence(e.title(), e.description(), e.tags(), e.startSec(), e.endSec()))
                     .toList();
             var aiDetection = new AudioDetectionResult(response.aiDetection().model(), response.aiDetection().score(), evidence);
-            return new AudioAnalysisResult(aiDetection, toScamDetection(response.scamDetection()));
+            return new AudioAnalysisResult(aiDetection, ScamDetectionJson.toScamDetection(response.scamDetection()));
         } catch (RestClientException e) {
             throw new DetectionServiceException("탐지 서버 호출에 실패했습니다: " + e.getMessage(), e);
         }
     }
 
-    private ScamDetectionResult toScamDetection(ScamDetectionDto dto) {
-        if (dto == null) {
-            return null;
-        }
-        List<ScamEvidence> evidence = dto.evidence().stream()
-                .map(e -> new ScamEvidence(e.sentence(), e.score()))
-                .toList();
-        return new ScamDetectionResult(dto.model(), dto.score(), evidence);
-    }
-
     private record AntiDeepfakeResponse(
             @JsonProperty("ai_detection") AiDetection aiDetection,
-            @JsonProperty("scam_detection") ScamDetectionDto scamDetection) {
+            @JsonProperty("scam_detection") ScamDetectionJson.Dto scamDetection) {
     }
 
     private record AiDetection(String model, double score, List<EvidenceDto> evidence) {
@@ -88,11 +77,5 @@ public class AntiDeepfakeHttpDetectionClient implements AudioDetectionClient {
             List<String> tags,
             @JsonProperty("start_sec") double startSec,
             @JsonProperty("end_sec") double endSec) {
-    }
-
-    private record ScamDetectionDto(String model, double score, List<ScamEvidenceDto> evidence) {
-    }
-
-    private record ScamEvidenceDto(String sentence, double score) {
     }
 }

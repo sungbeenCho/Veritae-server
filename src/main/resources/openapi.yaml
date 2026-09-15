@@ -153,6 +153,7 @@ paths:
                   model: spai
                   score: 0.000134
                   evidenceImage: null
+                scamDetection: null
         '400':
           $ref: '#/components/responses/InvalidImageFile'
         '401':
@@ -279,6 +280,12 @@ paths:
                           startSec: 3.0
                           endSec: 7.0
                       evidenceImage: "iVBORw0KGgoAAAANSUhEUgAA... (base64 PNG, 생략)"
+                    scamDetection:
+                      model: lilju
+                      score: 0.82
+                      evidence:
+                        - sentence: 지금 바로 계좌번호와 비밀번호를 알려주셔야 합니다.
+                          score: 0.95
                     errorCode: null
                     errorMessage: null
                 failed_no_face:
@@ -287,6 +294,7 @@ paths:
                     jobId: 11111111-1111-1111-1111-111111111111
                     status: FAILED
                     aiDetection: null
+                    scamDetection: null
                     errorCode: NO_FACE_DETECTED
                     errorMessage: 영상에서 얼굴을 찾을 수 없습니다. 얼굴이 잘 보이는 영상으로 다시 시도해주세요.
         '401':
