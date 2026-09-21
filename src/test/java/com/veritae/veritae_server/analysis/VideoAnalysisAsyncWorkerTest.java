@@ -1,9 +1,10 @@
 package com.veritae.veritae_server.analysis;
 
+import com.veritae.veritae_server.detection.ScamDetectionResult;
+import com.veritae.veritae_server.detection.ScamEvidence;
 import com.veritae.veritae_server.detection.VideoAnalysisResult;
 import com.veritae.veritae_server.detection.VideoDetectionResult;
 import com.veritae.veritae_server.detection.DetectionServiceException;
-import com.veritae.veritae_server.detection.NoFaceDetectedException;
 import com.veritae.veritae_server.detection.VideoDetectionClient;
 import com.veritae.veritae_server.domain.analysisjob.AnalysisJob;
 import com.veritae.veritae_server.domain.analysisjob.AnalysisJobRepository;
@@ -46,7 +47,7 @@ class VideoAnalysisAsyncWorkerTest {
         when(analysisJobRepository.findById(job.getId())).thenReturn(Optional.of(job));
         when(videoDetectionClient.detectVideo(any(), any(), any()))
                 .thenReturn(new VideoAnalysisResult(
-                        new VideoDetectionResult("dfdc", 0.91, List.of(), "base64png"), null));
+                        new VideoDetectionResult("dfdc", 0.91, List.of(), "base64png"), null, null));
 
         // When
         worker.process(job.getId(), "fake-bytes".getBytes(), "test.mp4", "video/mp4");
@@ -80,14 +81,14 @@ class VideoAnalysisAsyncWorkerTest {
     }
 
     @Test
-    void process_whenNoFaceDetected_shouldMarkJobFailedWithSpecificErrorMessage() {
-        // Given: 얼굴 없음은 정상적인 사용자 케이스라, 진짜 장애용 일반 메시지가 아니라
-        // 원인을 알려주는 구체적인 메시지가 나가야 한다(2026-08-27).
+    void process_whenNoFaceDetected_shouldMarkJobCompletedWithErrorCodeAndNoAiDetection() {
+        // Given: 얼굴 없음은 정상적인 한계지 장애가 아니라서(2026-09-21), 전체 실패가 아니라
+        // COMPLETED로 기록하고 이유는 errorCode/errorMessage에 담는다.
         worker = new VideoAnalysisAsyncWorker(videoDetectionClient, analysisJobRepository);
         AnalysisJob job = AnalysisJob.submit(UUID.randomUUID());
         when(analysisJobRepository.findById(job.getId())).thenReturn(Optional.of(job));
         when(videoDetectionClient.detectVideo(any(), any(), any()))
-                .thenThrow(new NoFaceDetectedException());
+                .thenReturn(new VideoAnalysisResult(null, null, "NO_FACE_DETECTED"));
 
         // When
         worker.process(job.getId(), "fake-bytes".getBytes(), "test.mp4", "video/mp4");
@@ -95,9 +96,31 @@ class VideoAnalysisAsyncWorkerTest {
         // Then
         verify(analysisJobRepository, org.mockito.Mockito.atLeastOnce()).save(jobCaptor.capture());
         AnalysisJob savedJob = jobCaptor.getValue();
-        assertThat(savedJob.getStatus()).isEqualTo(AnalysisJobStatus.FAILED);
+        assertThat(savedJob.getStatus()).isEqualTo(AnalysisJobStatus.COMPLETED);
         assertThat(savedJob.getErrorCode()).isEqualTo("NO_FACE_DETECTED");
-        assertThat(savedJob.getErrorMessage())
-                .isEqualTo("영상에서 얼굴을 찾을 수 없습니다. 얼굴이 잘 보이는 영상으로 다시 시도해주세요.");
+        assertThat(savedJob.getErrorMessage()).isNotBlank();
+    }
+
+    @Test
+    void process_whenNoFaceDetectedButScamDetectionSucceeded_shouldKeepScamDetectionInResultJson() {
+        // Given: AI판독은 얼굴없음으로 못 하지만, 별개로 도는 사기감지는 성공한 경우 -
+        // 이 결과를 버리지 않고 살려서 저장하는지가 이번 수정의 핵심이다(2026-09-21).
+        worker = new VideoAnalysisAsyncWorker(videoDetectionClient, analysisJobRepository);
+        AnalysisJob job = AnalysisJob.submit(UUID.randomUUID());
+        when(analysisJobRepository.findById(job.getId())).thenReturn(Optional.of(job));
+        var scamDetection = new ScamDetectionResult(
+                "lilju", 0.82, List.of(new ScamEvidence("계좌번호를 알려주세요", 0.95)));
+        when(videoDetectionClient.detectVideo(any(), any(), any()))
+                .thenReturn(new VideoAnalysisResult(null, scamDetection, "NO_FACE_DETECTED"));
+
+        // When
+        worker.process(job.getId(), "fake-bytes".getBytes(), "test.mp4", "video/mp4");
+
+        // Then
+        verify(analysisJobRepository, org.mockito.Mockito.atLeastOnce()).save(jobCaptor.capture());
+        AnalysisJob savedJob = jobCaptor.getValue();
+        assertThat(savedJob.getStatus()).isEqualTo(AnalysisJobStatus.COMPLETED);
+        assertThat(savedJob.getErrorCode()).isEqualTo("NO_FACE_DETECTED");
+        assertThat(savedJob.getResultJson()).contains("계좌번호를 알려주세요");
     }
 }

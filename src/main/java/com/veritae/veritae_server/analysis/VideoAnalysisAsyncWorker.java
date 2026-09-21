@@ -2,7 +2,6 @@ package com.veritae.veritae_server.analysis;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.veritae.veritae_server.detection.NoFaceDetectedException;
 import com.veritae.veritae_server.detection.VideoAnalysisResult;
 import com.veritae.veritae_server.detection.VideoDetectionClient;
 import com.veritae.veritae_server.domain.analysisjob.AnalysisJob;
@@ -44,13 +43,16 @@ public class VideoAnalysisAsyncWorker {
 
         try {
             VideoAnalysisResult result = videoDetectionClient.detectVideo(videoBytes, filename, contentType);
-            job.markCompleted(writeResultJson(result));
-        } catch (NoFaceDetectedException e) {
-            // 얼굴 없음은 진짜 장애가 아니라 정상적인 사용자 케이스라 error가 아니라 info로 남기고,
-            // 사용자에게도 원인을 구체적으로 알려준다(2026-08-27 - 예전엔 이것도 아래 catch(Exception)에
-            // 묶여서 "영상 분석 중 오류가 발생했습니다"로만 나왔었음).
-            log.info("영상 분석: 얼굴 미검출 jobId={}", jobId);
-            job.markFailed("NO_FACE_DETECTED", "영상에서 얼굴을 찾을 수 없습니다. 얼굴이 잘 보이는 영상으로 다시 시도해주세요.");
+            if (result.errorCode() != null) {
+                // 얼굴없음처럼 일부 판독만 정상적으로 비어있는 경우 - 사기감지 등 나머지 결과가
+                // 살아있을 수 있으니 전체 실패가 아니라 부분 성공(COMPLETED)으로 기록한다(2026-09-21,
+                // 예전엔 이것도 통째로 FAILED 처리돼서 살아있는 사기감지 결과까지 같이 버려졌었음).
+                log.info("영상 분석: 일부 판독 불가 jobId={} errorCode={}", jobId, result.errorCode());
+                job.markCompletedWithPartialError(
+                        writeResultJson(result), result.errorCode(), errorMessageFor(result.errorCode()));
+            } else {
+                job.markCompleted(writeResultJson(result));
+            }
         } catch (Exception e) {
             // 탐지 서버(Python)가 던지는 원문 에러 메시지에는 내부 경로/traceback 일부가 섞여 나올 수 있어
             // 클라이언트(errorMessage)에 그대로 노출하지 않는다. 상세 원인은 로그에만 남기고,
@@ -59,6 +61,13 @@ public class VideoAnalysisAsyncWorker {
             job.markFailed("ANALYSIS_FAILED", "영상 분석 중 오류가 발생했습니다.");
         }
         analysisJobRepository.save(job);
+    }
+
+    private String errorMessageFor(String errorCode) {
+        if ("NO_FACE_DETECTED".equals(errorCode)) {
+            return "영상에서 얼굴을 찾을 수 없어 AI판독은 제공되지 않습니다. 얼굴이 잘 보이는 영상이면 판독도 함께 받을 수 있습니다.";
+        }
+        return null;
     }
 
     private String writeResultJson(VideoAnalysisResult result) {

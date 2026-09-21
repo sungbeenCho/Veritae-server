@@ -41,6 +41,20 @@ class AnalysisJobTest {
     }
 
     @Test
+    void markCompletedWithPartialError_shouldStayCompletedAndStoreResultAndErrorCodeTogether() {
+        // 얼굴없음처럼 일부 판독만 정상적으로 비어있는 경우 - 전체 실패(FAILED)가 아니라
+        // COMPLETED를 유지하면서 이유도 같이 기록할 수 있어야 한다(2026-09-21).
+        AnalysisJob job = AnalysisJob.submit(UUID.randomUUID());
+
+        job.markCompletedWithPartialError("{\"scamDetection\":{\"score\":0.82}}", "NO_FACE_DETECTED", "얼굴을 찾을 수 없습니다.");
+
+        assertThat(job.getStatus()).isEqualTo(AnalysisJobStatus.COMPLETED);
+        assertThat(job.getResultJson()).isEqualTo("{\"scamDetection\":{\"score\":0.82}}");
+        assertThat(job.getErrorCode()).isEqualTo("NO_FACE_DETECTED");
+        assertThat(job.getErrorMessage()).isEqualTo("얼굴을 찾을 수 없습니다.");
+    }
+
+    @Test
     void markFailed_shouldTransitionToFailedAndStoreErrorCodeAndMessage() {
         AnalysisJob job = AnalysisJob.submit(UUID.randomUUID());
 

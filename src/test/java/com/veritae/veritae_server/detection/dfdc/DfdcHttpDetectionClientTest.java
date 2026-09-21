@@ -2,10 +2,7 @@ package com.veritae.veritae_server.detection.dfdc;
 
 import com.veritae.veritae_server.detection.VideoAnalysisResult;
 import com.veritae.veritae_server.detection.DetectionServiceException;
-import com.veritae.veritae_server.detection.NoFaceDetectedException;
 import org.junit.jupiter.api.Test;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
@@ -16,7 +13,6 @@ import static org.springframework.http.HttpMethod.POST;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withServerError;
-import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
 class DfdcHttpDetectionClientTest {
@@ -140,19 +136,49 @@ class DfdcHttpDetectionClientTest {
     }
 
     @Test
-    void detectVideo_whenServerReturns422_shouldThrowNoFaceDetectedException() {
-        // Given: 탐지 서버가 얼굴 미검출을 422로 알려주는 경우 - 이건 장애가 아니라 정상적인
-        // 사용자 케이스라 DetectionServiceException(502류)과 구분해야 한다(2026-08-27).
+    void detectVideo_whenNoFaceDetected_shouldReturnNullAiDetectionWithErrorCode() {
+        // Given: 얼굴 미검출은 이제 장애(422)가 아니라 정상 200 응답으로 오고, ai_detection이
+        // null, error_code가 이유를 담아온다(2026-09-21).
         RestClient.Builder builder = RestClient.builder().baseUrl("http://desktop:8000");
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
         server.expect(requestTo("http://desktop:8000/process/video"))
-                .andRespond(withStatus((HttpStatusCode) HttpStatus.UNPROCESSABLE_CONTENT)
-                        .body("{\"detail\": \"얼굴을 찾을 수 없습니다.\"}")
-                        .contentType(MediaType.APPLICATION_JSON));
+                .andRespond(withSuccess(
+                        """
+                        {"ai_detection": null, "scam_detection": null, "error_code": "NO_FACE_DETECTED"}
+                        """,
+                        MediaType.APPLICATION_JSON));
         DfdcHttpDetectionClient client = new DfdcHttpDetectionClient(builder.build());
 
-        // When / Then
-        assertThatThrownBy(() -> client.detectVideo("fake-bytes".getBytes(), "test.mp4", "video/mp4"))
-                .isInstanceOf(NoFaceDetectedException.class);
+        // When
+        VideoAnalysisResult result = client.detectVideo("fake-bytes".getBytes(), "test.mp4", "video/mp4");
+
+        // Then
+        assertThat(result.aiDetection()).isNull();
+        assertThat(result.scamDetection()).isNull();
+        assertThat(result.errorCode()).isEqualTo("NO_FACE_DETECTED");
+    }
+
+    @Test
+    void detectVideo_whenNoFaceDetectedButScamDetectionPresent_shouldKeepScamDetection() {
+        // Given: 얼굴없음이어도 사기감지 결과는 살아서 온다 - 이번 수정의 핵심 케이스(2026-09-21).
+        RestClient.Builder builder = RestClient.builder().baseUrl("http://desktop:8000");
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        server.expect(requestTo("http://desktop:8000/process/video"))
+                .andRespond(withSuccess(
+                        """
+                        {"ai_detection": null, "error_code": "NO_FACE_DETECTED",
+                         "scam_detection": {"model": "lilju", "score": 0.82,
+                             "evidence": [{"sentence": "계좌번호를 알려주세요", "score": 0.95}]}}
+                        """,
+                        MediaType.APPLICATION_JSON));
+        DfdcHttpDetectionClient client = new DfdcHttpDetectionClient(builder.build());
+
+        // When
+        VideoAnalysisResult result = client.detectVideo("fake-bytes".getBytes(), "test.mp4", "video/mp4");
+
+        // Then
+        assertThat(result.aiDetection()).isNull();
+        assertThat(result.errorCode()).isEqualTo("NO_FACE_DETECTED");
+        assertThat(result.scamDetection().score()).isEqualTo(0.82);
     }
 }

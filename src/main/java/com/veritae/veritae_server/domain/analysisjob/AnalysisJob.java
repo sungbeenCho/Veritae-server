@@ -81,6 +81,17 @@ public class AnalysisJob {
         this.updatedAt = Instant.now();
     }
 
+    // 판독 종류 중 일부(예: 얼굴없음으로 AI판독 불가)만 정상적인 이유로 비어있고 나머지는
+    // 살아있는 경우를 위한 메서드다. status는 COMPLETED로 유지하되 errorCode/errorMessage에
+    // "왜 일부가 비어있는지"를 담는다 - markFailed와 달리 완전 실패가 아니다(2026-09-21).
+    public void markCompletedWithPartialError(String resultJson, String errorCode, String errorMessage) {
+        this.status = AnalysisJobStatus.COMPLETED;
+        this.resultJson = resultJson;
+        this.errorCode = errorCode;
+        this.errorMessage = errorMessage;
+        this.updatedAt = Instant.now();
+    }
+
     public void markFailed(String errorCode, String errorMessage) {
         this.status = AnalysisJobStatus.FAILED;
         this.errorCode = errorCode;

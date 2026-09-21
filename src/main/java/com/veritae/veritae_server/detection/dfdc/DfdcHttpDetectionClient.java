@@ -3,7 +3,6 @@ package com.veritae.veritae_server.detection.dfdc;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.veritae.veritae_server.detection.DetectionServiceException;
 import com.veritae.veritae_server.detection.Evidence;
-import com.veritae.veritae_server.detection.NoFaceDetectedException;
 import com.veritae.veritae_server.detection.ScamDetectionJson;
 import com.veritae.veritae_server.detection.VideoAnalysisResult;
 import com.veritae.veritae_server.detection.VideoDetectionClient;
@@ -54,25 +53,26 @@ public class DfdcHttpDetectionClient implements VideoDetectionClient {
                     .retrieve()
                     .body(DfdcResponse.class);
 
-            if (response == null || response.aiDetection() == null) {
+            if (response == null) {
                 throw new DetectionServiceException("탐지 서버 응답이 비어 있습니다.", null);
             }
 
-            List<Evidence> evidence = response.aiDetection().evidence().stream()
-                    .map(e -> new Evidence(e.title(), e.description(), e.tags(), e.startSec(), e.endSec()))
-                    .toList();
-            var aiDetection = new VideoDetectionResult(
-                    response.aiDetection().model(),
-                    response.aiDetection().score(),
-                    evidence,
-                    response.aiDetection().evidenceImage());
-            return new VideoAnalysisResult(aiDetection, ScamDetectionJson.toScamDetection(response.scamDetection()));
-        } catch (RestClientResponseException e) {
-            // 422는 탐지 서버가 "얼굴을 못 찾음"을 명시적으로 알려주는 정상적인 사용자 케이스라,
-            // 그 외 상태코드(장애성)와 구분해서 전용 예외로 던진다(2026-08-27).
-            if (e.getStatusCode().value() == 422) {
-                throw new NoFaceDetectedException();
+            // aiDetection은 얼굴을 못 찾으면 null일 수 있다(정상적인 한계) - 그 경우
+            // response.errorCode()에 "NO_FACE_DETECTED"가 담겨 온다(2026-09-21).
+            VideoDetectionResult aiDetection = null;
+            if (response.aiDetection() != null) {
+                List<Evidence> evidence = response.aiDetection().evidence().stream()
+                        .map(e -> new Evidence(e.title(), e.description(), e.tags(), e.startSec(), e.endSec()))
+                        .toList();
+                aiDetection = new VideoDetectionResult(
+                        response.aiDetection().model(),
+                        response.aiDetection().score(),
+                        evidence,
+                        response.aiDetection().evidenceImage());
             }
+            return new VideoAnalysisResult(
+                    aiDetection, ScamDetectionJson.toScamDetection(response.scamDetection()), response.errorCode());
+        } catch (RestClientResponseException e) {
             throw new DetectionServiceException("탐지 서버 호출에 실패했습니다: " + e.getMessage(), e);
         } catch (RestClientException e) {
             throw new DetectionServiceException("탐지 서버 호출에 실패했습니다: " + e.getMessage(), e);
@@ -81,7 +81,8 @@ public class DfdcHttpDetectionClient implements VideoDetectionClient {
 
     private record DfdcResponse(
             @JsonProperty("ai_detection") AiDetection aiDetection,
-            @JsonProperty("scam_detection") ScamDetectionJson.Dto scamDetection) {
+            @JsonProperty("scam_detection") ScamDetectionJson.Dto scamDetection,
+            @JsonProperty("error_code") String errorCode) {
     }
 
     private record AiDetection(

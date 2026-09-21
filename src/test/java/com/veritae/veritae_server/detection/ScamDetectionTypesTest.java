@@ -33,7 +33,7 @@ class ScamDetectionTypesTest {
         var scamDetection = new ScamDetectionResult("lilju", 0.3, List.of());
 
         var audioResult = new AudioAnalysisResult(new AudioDetectionResult("antideepfake", 0.1, List.of()), scamDetection);
-        var videoResult = new VideoAnalysisResult(new VideoDetectionResult("dfdc", 0.2, List.of(), null), scamDetection);
+        var videoResult = new VideoAnalysisResult(new VideoDetectionResult("dfdc", 0.2, List.of(), null), scamDetection, null);
 
         assertThat(audioResult.scamDetection()).isEqualTo(scamDetection);
         assertThat(videoResult.scamDetection()).isEqualTo(scamDetection);

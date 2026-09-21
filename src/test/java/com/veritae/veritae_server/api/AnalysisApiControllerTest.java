@@ -171,7 +171,7 @@ class AnalysisApiControllerTest {
                         new VideoAnalysisResult(new VideoDetectionResult("dfdc", 0.91,
                                 List.of(new Evidence("얼굴 조작 의심 구간", "3.0초~7.0초 구간에서 얼굴 합성 흔적이 감지됨",
                                         List.of("temporal", "face-swap"), 3.0, 7.0)),
-                                "base64pngdata"), null),
+                                "base64pngdata"), null, null),
                         null,
                         null));
 
