@@ -470,7 +470,10 @@ components:
           allOf:
             - $ref: '#/components/schemas/ScamDetectionResult'
           nullable: true
-          description: 사기(보이스피싱 등) 위험도 판독 결과. 텍스트가 전혀 추출되지 않으면 없음(null).
+          description: >-
+            사기(보이스피싱 등) 위험도 판독 결과. 텍스트가 전혀 추출되지 않으면 없음(null) - 이 필드가
+            null이면 항상 "분석할 텍스트가 없었다"는 뜻이다. 사기감지 파이프라인 자체가 실패한 경우는
+            null로 조용히 넘어가지 않고 502로 요청 전체가 실패한다(2026-09-22).
 
     AudioAnalysisResponse:
       type: object
@@ -482,7 +485,10 @@ components:
           allOf:
             - $ref: '#/components/schemas/ScamDetectionResult'
           nullable: true
-          description: 사기(보이스피싱 등) 위험도 판독 결과. 텍스트가 전혀 추출되지 않으면 없음(null).
+          description: >-
+            사기(보이스피싱 등) 위험도 판독 결과. 텍스트가 전혀 추출되지 않으면 없음(null) - 이 필드가
+            null이면 항상 "분석할 텍스트가 없었다"는 뜻이다. 사기감지 파이프라인 자체가 실패한 경우는
+            null로 조용히 넘어가지 않고 502로 요청 전체가 실패한다(2026-09-22).
 
     AnalysisJobAcceptedResponse:
       type: object

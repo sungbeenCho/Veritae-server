@@ -122,7 +122,35 @@ class Spec(FPDF):
                 self.set_font("Consolas", "", 9.0)
             self.cell(self.get_string_width(seg), LINE_CODE, seg, ln=0)
 
+    def _wrap_code_line(self, line, max_width):
+        """code_block 한 줄이 상자 폭을 넘으면 문자 단위로 줄바꿈한다(2026-09-22 추가) -
+        원래 code_block은 줄바꿈이 전혀 없어서, 값이 긴 JSON 문자열(예: errorMessage)이
+        상자 밖으로 삐져나가 잘려 보이는 버그가 있었다. 한글/영문 혼합 폭 측정은
+        _mixed_line과 동일한 폰트 전환 규칙을 따라야 정확하다."""
+        wrapped, cur_line, cur_width = [], "", 0.0
+        for seg in HANGUL_RE.findall(line):
+            font = "Gulim" if re.match(r'^[\uac00-\ud7a3]+$', seg) else "Consolas"
+            self.set_font(font, "", 9.0)
+            for ch in seg:
+                ch_w = self.get_string_width(ch)
+                if cur_width + ch_w > max_width and cur_line:
+                    wrapped.append(cur_line)
+                    cur_line, cur_width = ch, ch_w
+                else:
+                    cur_line += ch
+                    cur_width += ch_w
+        wrapped.append(cur_line)
+        return wrapped
+
+    def _wrapped_code_lines(self, lines):
+        max_w = self.content_w() - 22
+        result = []
+        for line in lines:
+            result.extend(self._wrap_code_line(line, max_w))
+        return result
+
     def code_block(self, lines):
+        lines = self._wrapped_code_lines(lines)
         pad_top, pad_bottom = 10, 15
         h = pad_top + LINE_CODE * len(lines) + pad_bottom
         if self.get_y() + h > self.page_break_trigger:
@@ -174,13 +202,35 @@ class Spec(FPDF):
         if resp_lines is not None:
             self.label("응답 예시")
             self.ln(LINE_BODY + 2)
-            self.code_block(resp_lines)
+            if resp_lines and isinstance(resp_lines[0], tuple):
+                # 프론트가 마주칠 수 있는 여러 상태를 다 보여주기 위한 다중 예시:
+                # [(라벨, JSON 줄 목록), ...] 형태 - 케이스 사이에 라벨을 넣어 구분한다.
+                for i, (ex_label, ex_lines) in enumerate(resp_lines):
+                    if i > 0:
+                        self.ln(4)
+                    # 라벨과 코드블록이 페이지 경계에서 따로 떨어지지 않게, 둘을 합친
+                    # 높이로 미리 넘어갈지 판단한다(2026-09-22) - code_block() 혼자만
+                    # 자기 높이를 체크하면 라벨만 이전 페이지 끝에 남는 문제가 있었음.
+                    pair_h = LINE_BODY + self._code_block_height(ex_lines)
+                    if self.get_y() + pair_h > self.page_break_trigger:
+                        self.add_page()
+                    self.set_font("Malgun", "B", 9.2)
+                    self.set_text_color(*ACCENT)
+                    self.cell(0, LINE_BODY, ex_label, ln=1)
+                    self.set_text_color(*TEXT)
+                    self.code_block(ex_lines)
+            else:
+                self.code_block(resp_lines)
         if resp_note:
             self.note(resp_note)
         if status_codes:
             self.label("상태 코드")
             self.ln(LINE_BODY + 2)
             self.bullets(status_codes)
+        # 다음 섹션(번호)이 바로 이어붙어 보이지 않게, 엔드포인트 끝에 확실한 여백을
+        # 추가로 준다(2026-09-22) - bullets()가 주는 기본 여백(3pt)만으로는 다음
+        # section_header()의 구분선과 붙어 보이는 경우가 있었음.
+        self.ln(14)
 
     def _wrapped_lines(self, font_fam, style, size, text, width):
         """multi_cell이 text를 width 안에 넣을 때 몇 줄이 될지 미리 계산한다(순수 계산,
@@ -205,7 +255,7 @@ class Spec(FPDF):
         return total + 3
 
     def _code_block_height(self, lines):
-        return 10 + LINE_CODE * len(lines) + 15
+        return 10 + LINE_CODE * len(self._wrapped_code_lines(lines)) + 15
 
     def _measure_endpoint(self, num, name, method, url, desc, req_body=None,
                            req_params=None, resp_lines=None, resp_note=None,
@@ -226,12 +276,20 @@ class Spec(FPDF):
                 h += self._code_block_height(req_body)
         if resp_lines is not None:
             h += LINE_BODY + (LINE_BODY + 2)
-            h += self._code_block_height(resp_lines)
+            if resp_lines and isinstance(resp_lines[0], tuple):
+                for i, (_ex_label, ex_lines) in enumerate(resp_lines):
+                    if i > 0:
+                        h += 4
+                    h += LINE_BODY
+                    h += self._code_block_height(ex_lines)
+            else:
+                h += self._code_block_height(resp_lines)
         if resp_note:
             h += self._wrapped_lines("Malgun", "", 8.6, resp_note, self.content_w()) * 12.2 + 2
         if status_codes:
             h += LINE_BODY + (LINE_BODY + 2)
             h += self._bullets_height(status_codes)
+        h += 14  # 다음 섹션과의 여백(_endpoint_body 끝의 self.ln(14)와 반드시 맞춰야 함)
         return h
 
     def _keep_together(self, height):
@@ -252,10 +310,11 @@ class Spec(FPDF):
 
     def intro_block(self, header_text, bullet_items):
         """"인증 방식" 같은, 헤더+불릿만으로 된 짧은 섹션을 한 페이지에 묶어 렌더링한다."""
-        h = 28 + self._bullets_height(bullet_items)
+        h = 28 + self._bullets_height(bullet_items) + 14  # +14: 다음 섹션과의 여백(endpoint()와 동일)
         self._keep_together(h)
         self.section_header(header_text)
         self.bullets(bullet_items)
+        self.ln(14)
 
     def error_format_block(self, header_text, intro_text, code_lines):
         """"오류 응답 형식" 섹션(헤더+설명+예시 코드블록)을 한 페이지에 묶어 렌더링한다."""
@@ -417,19 +476,47 @@ pdf.endpoint(
 # ---- 5. 이미지 AI 판독 ----
 pdf.endpoint(
     5, "이미지 AI 판독", "POST", "/api/v1/analysis/image",
-    "업로드한 이미지가 AI로 생성되었을 확률을 점수로 반환. 탐지 서버 호출이 끝날 때까지 응답을 "
-    "기다리는 동기 방식(수 초~수십 초 소요 가능)",
+    "업로드한 이미지가 AI로 생성되었을 확률과 사기(보이스피싱 등) 위험도를 함께 반환. 탐지 서버 호출이 "
+    "끝날 때까지 응답을 기다리는 동기 방식(수 초~수십 초 소요 가능)",
     req_body=["MULTIPART", "file: 분석할 이미지 파일(jpeg/png/webp)"],
     resp_lines=[
-        "{",
-        '  "aiDetection": {',
-        '    "model": "spai",',
-        '    "score": 0.000134,',
-        '    "evidenceImage": null',
-        "  }",
-        "}",
+        ("AI 생성 이미지로 판별 + 사기 위험 텍스트도 있는 경우", [
+            "{",
+            '  "aiDetection": {',
+            '    "model": "spai",',
+            '    "score": 0.97,',
+            '    "evidenceImage": "iVBORw0KGgoAAAANSUhEUgAA... (base64 PNG, 생략)"',
+            "  },",
+            '  "scamDetection": {',
+            '    "model": "lilju",',
+            '    "score": 0.82,',
+            '    "evidence": [',
+            "      {",
+            '        "sentence": "지금 바로 계좌번호와 비밀번호를 알려주셔야 합니다.",',
+            '        "score": 0.95',
+            "      }",
+            "    ]",
+            "  }",
+            "}",
+        ]),
+        ("실제 사진(AI 아님) + 텍스트가 전혀 없는 경우", [
+            "{",
+            '  "aiDetection": {',
+            '    "model": "spai",',
+            '    "score": 0.000134,',
+            '    "evidenceImage": null',
+            "  },",
+            '  "scamDetection": null',
+            "}",
+        ]),
     ],
-    resp_note="evidenceImage: 판독 근거 히트맵(base64 PNG). 이미지의 어느 부분이 의심스러운지 시각적으로 보여준다(best-effort - 실패하면 null).",
+    resp_note=(
+        "evidenceImage: 판독 근거 히트맵(base64 PNG). 이미지의 어느 부분이 의심스러운지 시각적으로 "
+        "보여준다(best-effort - 실패하면 null). scamDetection: 이미지에서 텍스트가 추출되면 그 내용의 "
+        "사기 위험도(model/score/evidence)를 채워 반환하고, 텍스트가 전혀 없으면 null이다 - 이 필드가 "
+        "null이면 항상 '텍스트가 없었다'는 뜻이며, 사기감지 파이프라인 자체가 실패한 경우는 null로 "
+        "조용히 넘어가지 않고 502로 요청 전체가 실패한다(아래 상태 코드의 502 참고, 2026-09-22 정책)."
+    ),
     status_codes=[
         "200 OK",
         "400 Bad Request (빈 파일/지원하지 않는 형식)",
@@ -442,25 +529,53 @@ pdf.endpoint(
 # ---- 6. 음성 AI 판독 ----
 pdf.endpoint(
     6, "음성 AI 판독", "POST", "/api/v1/analysis/audio",
-    "업로드한 음성이 AI로 생성(합성)되었을 확률과 판독 근거(시간 구간) 반환. 동기 방식",
+    "업로드한 음성이 AI로 생성(합성)되었을 확률/판독 근거(시간 구간)와 사기(보이스피싱 등) 위험도를 "
+    "함께 반환. 동기 방식",
     req_body=["MULTIPART", "file: 분석할 음성 파일(wav/mp3/m4a/aac, 최대 5분/25MB)"],
     resp_lines=[
-        "{",
-        '  "aiDetection": {',
-        '    "model": "antideepfake",',
-        '    "score": 0.0018,',
-        '    "evidence": [',
-        "      {",
-        '        "title": "시간 구간 이상 패턴",',
-        '        "description": "0.5초~1.2초 구간에서 합성 흔적이 감지됨",',
-        '        "tags": ["temporal"],',
-        '        "startSec": 0.5,',
-        '        "endSec": 1.2',
-        "      }",
-        "    ]",
-        "  }",
-        "}",
+        ("사기 위험 텍스트가 있는 경우", [
+            "{",
+            '  "aiDetection": {',
+            '    "model": "antideepfake",',
+            '    "score": 0.0018,',
+            '    "evidence": [',
+            "      {",
+            '        "title": "시간 구간 이상 패턴",',
+            '        "description": "0.5초~1.2초 구간에서 합성 흔적이 감지됨",',
+            '        "tags": ["temporal"],',
+            '        "startSec": 0.5,',
+            '        "endSec": 1.2',
+            "      }",
+            "    ]",
+            "  },",
+            '  "scamDetection": {',
+            '    "model": "lilju",',
+            '    "score": 0.82,',
+            '    "evidence": [',
+            "      {",
+            '        "sentence": "지금 바로 계좌번호와 비밀번호를 알려주셔야 합니다.",',
+            '        "score": 0.95',
+            "      }",
+            "    ]",
+            "  }",
+            "}",
+        ]),
+        ("텍스트가 전혀 없는 경우", [
+            "{",
+            '  "aiDetection": {',
+            '    "model": "antideepfake",',
+            '    "score": 0.0018,',
+            '    "evidence": []',
+            "  },",
+            '  "scamDetection": null',
+            "}",
+        ]),
     ],
+    resp_note=(
+        "scamDetection: 음성에서 텍스트(발화)가 추출되면 그 내용의 사기 위험도를 채워 반환하고, 발화가 "
+        "전혀 없으면 null이다 - 이 필드가 null이면 항상 '텍스트가 없었다'는 뜻이며, 사기감지 파이프라인 "
+        "자체가 실패한 경우는 null로 조용히 넘어가지 않고 502로 요청 전체가 실패한다(2026-09-22 정책)."
+    ),
     status_codes=[
         "200 OK",
         "400 Bad Request (빈 파일/지원하지 않는 형식/25MB 초과)",
@@ -493,37 +608,92 @@ pdf.endpoint(
 # ---- 8. 분석 작업 상태/결과 조회 (M4 반영: errorCode 추가) ----
 pdf.endpoint(
     8, "분석 작업 상태/결과 조회", "GET", "/api/v1/analysis/jobs/{jobId}",
-    "7번 API로 접수한 작업의 현재 상태 조회. status가 COMPLETED일 때만 aiDetection이, FAILED일 "
-    "때만 errorCode/errorMessage가 채워짐. 본인이 접수한 작업이 아니면 404 반환",
+    "7번 API로 접수한 작업의 현재 상태를 조회한다. status가 FAILED이면 aiDetection/scamDetection "
+    "둘 다 없다. status가 COMPLETED여도 얼굴을 찾지 못한 영상이면 aiDetection은 없을 수 있다 "
+    "(scamDetection은 별개로 채워질 수 있음) - status만으로 각 필드의 존재 여부를 추측하지 말고 "
+    "aiDetection/scamDetection은 항상 각각 null 체크할 것. 본인이 접수한 작업이 아니면 404 반환",
     req_params=["jobId (path, UUID): 조회할 작업 ID"],
     resp_lines=[
-        "{",
-        '  "jobId": "11111111-1111-1111-1111-111111111111",',
-        '  "status": "COMPLETED",',
-        '  "aiDetection": {',
-        '    "model": "dfdc",',
-        '    "score": 0.91,',
-        '    "evidence": [',
-        "      {",
-        '        "title": "얼굴 조작 의심 구간",',
-        '        "description": "3.0초~7.0초 구간에서 얼굴 합성 흔적이 감지됨",',
-        '        "tags": ["temporal", "face-swap"],',
-        '        "startSec": 3.0,',
-        '        "endSec": 7.0',
-        "      }",
-        "    ],",
-        '    "evidenceImage": "iVBORw0KGgoAAAANSUhEUgAA... (base64 PNG, 생략)"',
-        "  },",
-        '  "errorCode": null,',
-        '  "errorMessage": null',
-        "}",
+        ("진행 중", [
+            "{",
+            '  "jobId": "11111111-1111-1111-1111-111111111111",',
+            '  "status": "PROCESSING",',
+            '  "aiDetection": null,',
+            '  "scamDetection": null,',
+            '  "errorCode": null,',
+            '  "errorMessage": null',
+            "}",
+        ]),
+        ("완료 - 얼굴판독/사기감지 둘 다 성공", [
+            "{",
+            '  "jobId": "11111111-1111-1111-1111-111111111111",',
+            '  "status": "COMPLETED",',
+            '  "aiDetection": {',
+            '    "model": "dfdc",',
+            '    "score": 0.91,',
+            '    "evidence": [',
+            "      {",
+            '        "title": "얼굴 조작 의심 구간",',
+            '        "description": "3.0초~7.0초 구간에서 얼굴 합성 흔적이 감지됨",',
+            '        "tags": ["temporal", "face-swap"],',
+            '        "startSec": 3.0,',
+            '        "endSec": 7.0',
+            "      }",
+            "    ],",
+            '    "evidenceImage": "iVBORw0KGgoAAAANSUhEUgAA... (base64 PNG, 생략)"',
+            "  },",
+            '  "scamDetection": {',
+            '    "model": "lilju",',
+            '    "score": 0.82,',
+            '    "evidence": [',
+            "      {",
+            '        "sentence": "지금 바로 계좌번호와 비밀번호를 알려주셔야 합니다.",',
+            '        "score": 0.95',
+            "      }",
+            "    ]",
+            "  },",
+            '  "errorCode": null,',
+            '  "errorMessage": null',
+            "}",
+        ]),
+        ("완료 - 얼굴없음(AI판독 불가), 사기감지는 성공", [
+            "{",
+            '  "jobId": "11111111-1111-1111-1111-111111111111",',
+            '  "status": "COMPLETED",',
+            '  "aiDetection": null,',
+            '  "scamDetection": {',
+            '    "model": "lilju",',
+            '    "score": 0.82,',
+            '    "evidence": [',
+            "      {",
+            '        "sentence": "지금 바로 계좌번호와 비밀번호를 알려주셔야 합니다.",',
+            '        "score": 0.95',
+            "      }",
+            "    ]",
+            "  },",
+            '  "errorCode": "NO_FACE_DETECTED",',
+            '  "errorMessage": "영상에서 얼굴을 찾을 수 없어 AI판독은 제공되지 않습니다. 얼굴이 잘 보이는 영상이면 판독도 함께 받을 수 있습니다."',
+            "}",
+        ]),
+        ("완전 실패 (AI판독/사기감지 모두 실패, 또는 처리 자체 오류)", [
+            "{",
+            '  "jobId": "11111111-1111-1111-1111-111111111111",',
+            '  "status": "FAILED",',
+            '  "aiDetection": null,',
+            '  "scamDetection": null,',
+            '  "errorCode": "ANALYSIS_FAILED",',
+            '  "errorMessage": "영상 분석 중 오류가 발생했습니다."',
+            "}",
+        ]),
     ],
     resp_note=(
-        "status: PENDING | PROCESSING | COMPLETED | FAILED. FAILED일 때 errorCode/errorMessage가 "
-        "함께 채워진다. errorCode는 NO_FACE_DETECTED(영상에서 얼굴을 찾지 못함 - 다른 영상으로 재시도 "
-        "유도) 또는 ANALYSIS_FAILED(그 외 처리 실패 - 같은 영상으로 재시도 가능) 중 하나이며, 클라이언트의 "
-        "분기 처리는 이 값을 써야 한다. errorMessage는 사용자에게 그대로 보여줄 문구로, 표현이 다듬어질 "
-        "수 있어 분기 판단에는 쓰지 않는다."
+        "status: PENDING | PROCESSING | COMPLETED | FAILED. errorCode/errorMessage는 두 경우에 채워진다: "
+        "(1) status가 FAILED일 때 - 완전 실패 사유. (2) status가 COMPLETED인데 얼굴을 찾지 못해 "
+        "aiDetection만 비어있을 때 - 부분 사유(현재 값 NO_FACE_DETECTED). 즉 errorCode가 있다고 해서 "
+        "무조건 실패가 아니다 - status를 먼저 보고, COMPLETED면 aiDetection/scamDetection 각각 null "
+        "체크로 화면을 구성할 것(위 COMPLETED 예시 참고). FAILED일 때의 errorCode는 ANALYSIS_FAILED"
+        "(처리 자체 실패 - 같은 영상으로 재시도 가능)이다. errorMessage는 사용자에게 그대로 보여줄 문구로, "
+        "표현이 다듬어질 수 있어 분기 판단에는 절대 쓰지 말고 errorCode만 쓸 것."
     ),
     status_codes=[
         "200 OK",
