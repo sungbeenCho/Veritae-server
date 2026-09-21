@@ -41,7 +41,9 @@ public final class AnalysisApiMapper {
 
     public static AnalysisJobResponse toJobResponse(AnalysisJobView view) {
         VideoAnalysisResult result = view.result();
-        var aiDetection = result != null ? toOpenApiResult(result.aiDetection()) : null;
+        // result가 있어도 그 안의 aiDetection은 얼굴없음 등의 이유로 null일 수 있다(2026-09-21) -
+        // result만 null 체크하면 toOpenApiResult(null) 호출로 NPE가 난다.
+        var aiDetection = result != null && result.aiDetection() != null ? toOpenApiResult(result.aiDetection()) : null;
         var scamDetection = result != null ? toOpenApiScamDetection(result.scamDetection()) : null;
         var status = AnalysisJobResponse.StatusEnum.fromValue(view.status().name());
         return new AnalysisJobResponse(view.jobId(), status)

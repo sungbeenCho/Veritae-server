@@ -186,6 +186,33 @@ class AnalysisApiControllerTest {
 
     @Test
     @WithMockUser
+    void getAnalysisJob_withNoFaceDetectedButScamDetectionPresent_shouldReturn200WithNullAiDetection() throws Exception {
+        // 얼굴없음으로 aiDetection은 null이지만 job 자체는 COMPLETED이고 scamDetection은
+        // 살아있는 경우 - 실기 검증 중 500(NPE)이 발생해 재현하는 회귀 테스트(2026-09-21).
+        java.util.UUID jobId = java.util.UUID.randomUUID();
+        java.util.UUID memberId = java.util.UUID.randomUUID();
+        when(authenticatedMemberResolver.currentMemberId()).thenReturn(memberId);
+        var scamDetection = new com.veritae.veritae_server.detection.ScamDetectionResult(
+                "lilju", 0.82,
+                List.of(new com.veritae.veritae_server.detection.ScamEvidence("계좌번호를 알려주세요", 0.95)));
+        when(videoAnalysisService.getJob(jobId, memberId)).thenReturn(
+                new com.veritae.veritae_server.analysis.AnalysisJobView(
+                        jobId,
+                        com.veritae.veritae_server.domain.analysisjob.AnalysisJobStatus.COMPLETED,
+                        new VideoAnalysisResult(null, scamDetection, "NO_FACE_DETECTED"),
+                        "NO_FACE_DETECTED",
+                        "영상에서 얼굴을 찾을 수 없어 AI판독은 제공되지 않습니다."));
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/v1/analysis/jobs/" + jobId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("COMPLETED"))
+                .andExpect(jsonPath("$.aiDetection").doesNotExist())
+                .andExpect(jsonPath("$.scamDetection.score").value(0.82))
+                .andExpect(jsonPath("$.errorCode").value("NO_FACE_DETECTED"));
+    }
+
+    @Test
+    @WithMockUser
     void getAnalysisJob_withNonExistentJob_shouldReturn404() throws Exception {
         java.util.UUID jobId = java.util.UUID.randomUUID();
         java.util.UUID memberId = java.util.UUID.randomUUID();
