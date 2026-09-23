@@ -81,11 +81,10 @@ public final class AnalysisApiMapper {
     }
 
     public static com.veritae.veritae_server.openapi.model.AnalysisRecordListResponse toRecordListResponse(
-            org.springframework.data.domain.Page<com.veritae.veritae_server.domain.analysisrecord.AnalysisRecord> page) {
+            List<com.veritae.veritae_server.domain.analysisrecord.AnalysisRecord> records) {
         List<com.veritae.veritae_server.openapi.model.AnalysisRecordSummary> content =
-                page.getContent().stream().map(AnalysisApiMapper::toRecordSummary).toList();
-        return new com.veritae.veritae_server.openapi.model.AnalysisRecordListResponse(
-                content, page.getNumber(), page.getSize(), page.getTotalElements(), page.getTotalPages());
+                records.stream().map(AnalysisApiMapper::toRecordSummary).toList();
+        return new com.veritae.veritae_server.openapi.model.AnalysisRecordListResponse(content);
     }
 
     public static com.veritae.veritae_server.openapi.model.AnalysisRecordSummary toRecordSummary(

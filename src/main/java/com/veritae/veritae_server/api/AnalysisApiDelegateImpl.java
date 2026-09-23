@@ -58,11 +58,9 @@ public class AnalysisApiDelegateImpl implements AnalysisApiDelegate {
     }
 
     @Override
-    public ResponseEntity<AnalysisRecordListResponse> getAnalysisRecords(Integer page, Integer size) {
+    public ResponseEntity<AnalysisRecordListResponse> getAnalysisRecords() {
         UUID memberId = authenticatedMemberResolver.currentMemberId();
-        // page/size는 생성된 AnalysisApi 인터페이스에서 @RequestParam(defaultValue = ...)로
-        // 이미 기본값이 채워져 들어오므로 여기서 null 체크할 필요가 없다.
-        var records = analysisHistoryService.getRecords(memberId, page, size);
+        var records = analysisHistoryService.getRecords(memberId);
         return ResponseEntity.ok(AnalysisApiMapper.toRecordListResponse(records));
     }
 

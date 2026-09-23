@@ -29,6 +29,7 @@ import java.util.List;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -245,7 +246,7 @@ class AnalysisApiControllerTest {
 
     @Test
     @WithMockUser
-    void getAnalysisRecords_withAuthenticatedMember_shouldReturn200WithPagedContent() throws Exception {
+    void getAnalysisRecords_withAuthenticatedMember_shouldReturn200WithRecentContent() throws Exception {
         java.util.UUID memberId = java.util.UUID.randomUUID();
         when(authenticatedMemberResolver.currentMemberId()).thenReturn(memberId);
         var objectMapper = new com.fasterxml.jackson.databind.ObjectMapper();
@@ -253,15 +254,18 @@ class AnalysisApiControllerTest {
         var record = com.veritae.veritae_server.domain.analysisrecord.AnalysisRecord.completedSync(
                 memberId, com.veritae.veritae_server.domain.analysisrecord.Modality.IMAGE,
                 objectMapper.writeValueAsString(result), 0.1, null);
-        var page = new org.springframework.data.domain.PageImpl<>(List.of(record));
-        when(analysisHistoryService.getRecords(memberId, 0, 10)).thenReturn(page);
+        when(analysisHistoryService.getRecords(memberId)).thenReturn(List.of(record));
 
         mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
                         .get("/api/v1/analysis/records"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content[0].modality").value("IMAGE"))
                 .andExpect(jsonPath("$.content[0].imageDetection.model").value("spai"))
-                .andExpect(jsonPath("$.totalElements").value(1));
+                .andExpect(jsonPath("$.content.length()").value(1))
+                .andExpect(jsonPath("$.content[0].audioDetection").doesNotExist())
+                .andExpect(jsonPath("$.content[0].videoDetection").doesNotExist())
+                .andExpect(content().string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("audioDetection"))))
+                .andExpect(content().string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("videoDetection"))));
     }
 
     @Test

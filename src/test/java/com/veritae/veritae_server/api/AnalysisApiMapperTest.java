@@ -12,8 +12,6 @@ import com.veritae.veritae_server.detection.VideoAnalysisResult;
 import com.veritae.veritae_server.domain.analysisrecord.AnalysisRecord;
 import com.veritae.veritae_server.domain.analysisrecord.Modality;
 import org.junit.jupiter.api.Test;
-import org.springframework.data.domain.PageImpl;
-import org.springframework.data.domain.PageRequest;
 
 import java.util.List;
 import java.util.UUID;
@@ -89,20 +87,15 @@ class AnalysisApiMapperTest {
     }
 
     @Test
-    void toRecordListResponse_shouldMapPageMetadata() throws Exception {
+    void toRecordListResponse_shouldMapContentOnly() throws Exception {
         var objectMapper = new com.fasterxml.jackson.databind.ObjectMapper();
         var result = new ImageAnalysisResult(new ImageDetectionResult("spai", 0.1, null), null);
         var record = AnalysisRecord.completedSync(
                 UUID.randomUUID(), Modality.IMAGE, objectMapper.writeValueAsString(result), 0.1, null);
-        var page = new PageImpl<>(List.of(record), PageRequest.of(1, 10), 23);
 
-        var response = AnalysisApiMapper.toRecordListResponse(page);
+        var response = AnalysisApiMapper.toRecordListResponse(List.of(record));
 
         assertThat(response.getContent()).hasSize(1);
-        assertThat(response.getPage()).isEqualTo(1);
-        assertThat(response.getSize()).isEqualTo(10);
-        assertThat(response.getTotalElements()).isEqualTo(23);
-        assertThat(response.getTotalPages()).isEqualTo(3);
     }
 
     @Test

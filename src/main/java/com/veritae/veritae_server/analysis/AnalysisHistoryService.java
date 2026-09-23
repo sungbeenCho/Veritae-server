@@ -5,11 +5,11 @@ import com.veritae.veritae_server.domain.analysisrecord.AnalysisRecord;
 import com.veritae.veritae_server.domain.analysisrecord.AnalysisRecordRepository;
 import com.veritae.veritae_server.domain.analysisrecord.Modality;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -20,12 +20,15 @@ public class AnalysisHistoryService {
     // (docs/superpowers/specs/2026-09-23-analysis-history-report-design.md — 고정값, 추후 조정 가능).
     private static final double RISK_THRESHOLD = 0.5;
 
+    // 목록 조회는 페이지네이션 없이 최신 10건 고정.
+    private static final int RECENT_RECORDS_LIMIT = 10;
+
     private final AnalysisRecordRepository analysisRecordRepository;
 
-    public Page<AnalysisRecord> getRecords(UUID memberId, int page, int size) {
+    public List<AnalysisRecord> getRecords(UUID memberId) {
         // 정렬은 리포지토리 메서드 이름(OrderByCreatedAtDesc)에 이미 들어있어 Pageable에 Sort를 또 줄 필요가 없다.
         return analysisRecordRepository.findByMemberIdAndStatusOrderByCreatedAtDesc(
-                memberId, AnalysisJobStatus.COMPLETED, PageRequest.of(page, size));
+                memberId, AnalysisJobStatus.COMPLETED, PageRequest.of(0, RECENT_RECORDS_LIMIT)).getContent();
     }
 
     // 6번의 count 쿼리가 서로 다른 트랜잭션에서 실행되면 그 사이에 새 기록이 저장됐을 때

@@ -11,13 +11,11 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Sort;
 
 import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
@@ -35,17 +33,17 @@ class AnalysisHistoryServiceTest {
     }
 
     @Test
-    void getRecords_shouldQueryCompletedRecordsForMemberWithPagination() {
+    void getRecords_shouldQueryRecentCompletedRecordsForMember() {
         UUID memberId = UUID.randomUUID();
         AnalysisRecord record = AnalysisRecord.completedSync(memberId, Modality.IMAGE, "{}", 0.1, null);
         Page<AnalysisRecord> expected = new PageImpl<>(List.of(record));
         when(analysisRecordRepository.findByMemberIdAndStatusOrderByCreatedAtDesc(
-                eq(memberId), eq(AnalysisJobStatus.COMPLETED), any(PageRequest.class)))
+                eq(memberId), eq(AnalysisJobStatus.COMPLETED), eq(PageRequest.of(0, 10))))
                 .thenReturn(expected);
 
-        Page<AnalysisRecord> result = analysisHistoryService.getRecords(memberId, 0, 10);
+        List<AnalysisRecord> result = analysisHistoryService.getRecords(memberId);
 
-        assertThat(result.getContent()).containsExactly(record);
+        assertThat(result).containsExactly(record);
     }
 
     @Test
