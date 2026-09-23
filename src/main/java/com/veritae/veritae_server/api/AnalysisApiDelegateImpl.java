@@ -35,7 +35,8 @@ public class AnalysisApiDelegateImpl implements AnalysisApiDelegate {
 
     @Override
     public ResponseEntity<AudioAnalysisResponse> analyzeAudio(MultipartFile file) {
-        var result = audioAnalysisService.analyzeAudio(file);
+        UUID memberId = authenticatedMemberResolver.currentMemberId();
+        var result = audioAnalysisService.analyzeAudio(file, memberId);
         return ResponseEntity.ok(AnalysisApiMapper.toAudioResponse(result));
     }
 

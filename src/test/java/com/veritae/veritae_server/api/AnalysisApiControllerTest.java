@@ -120,7 +120,9 @@ class AnalysisApiControllerTest {
     @WithMockUser
     void analyzeAudio_withAuthenticatedMemberAndValidFile_shouldReturn200WithScoreAndEvidence() throws Exception {
         var file = new MockMultipartFile("file", "test.wav", "audio/wav", "fake-bytes".getBytes());
-        when(audioAnalysisService.analyzeAudio(any())).thenReturn(new AudioAnalysisResult(new AudioDetectionResult(
+        java.util.UUID memberId = java.util.UUID.randomUUID();
+        when(authenticatedMemberResolver.currentMemberId()).thenReturn(memberId);
+        when(audioAnalysisService.analyzeAudio(any(), any())).thenReturn(new AudioAnalysisResult(new AudioDetectionResult(
                 "antideepfake", 0.87,
                 List.of(new Evidence(
                         "시간 구간 이상 패턴", "0.5초~1.2초 구간에서 합성 흔적이 감지됨",

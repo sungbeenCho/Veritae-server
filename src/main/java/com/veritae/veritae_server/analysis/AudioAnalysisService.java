@@ -2,6 +2,9 @@ package com.veritae.veritae_server.analysis;
 
 import com.veritae.veritae_server.detection.AudioAnalysisResult;
 import com.veritae.veritae_server.detection.AudioDetectionClient;
+import com.veritae.veritae_server.domain.analysisrecord.AnalysisRecord;
+import com.veritae.veritae_server.domain.analysisrecord.AnalysisRecordRepository;
+import com.veritae.veritae_server.domain.analysisrecord.Modality;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
@@ -9,6 +12,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.util.Set;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -18,15 +22,27 @@ public class AudioAnalysisService {
             Set.of("audio/wav", "audio/x-wav", "audio/mpeg", "audio/mp4", "audio/aac");
     private static final long MAX_FILE_SIZE_BYTES = 25L * 1024 * 1024;
 
-    private final AudioDetectionClient audioDetectionClient;
+    private static final com.fasterxml.jackson.databind.ObjectMapper OBJECT_MAPPER =
+            new com.fasterxml.jackson.databind.ObjectMapper();
 
-    public AudioAnalysisResult analyzeAudio(MultipartFile file) {
+    private final AudioDetectionClient audioDetectionClient;
+    private final AnalysisRecordRepository analysisRecordRepository;
+
+    public AudioAnalysisResult analyzeAudio(MultipartFile file, UUID memberId) {
         validate(file);
+        AudioAnalysisResult result;
         try {
-            return audioDetectionClient.detectAudio(file.getBytes(), file.getOriginalFilename(), file.getContentType());
+            result = audioDetectionClient.detectAudio(file.getBytes(), file.getOriginalFilename(), file.getContentType());
         } catch (IOException e) {
             throw new UncheckedIOException("업로드된 파일을 읽을 수 없습니다.", e);
         }
+
+        Double aiScore = result.aiDetection() != null ? result.aiDetection().score() : null;
+        Double scamScore = result.scamDetection() != null ? result.scamDetection().score() : null;
+        analysisRecordRepository.save(AnalysisRecord.completedSync(
+                memberId, Modality.AUDIO, writeResultJson(result), aiScore, scamScore));
+
+        return result;
     }
 
     private void validate(MultipartFile file) {
@@ -39,6 +55,14 @@ public class AudioAnalysisService {
         }
         if (file.getSize() > MAX_FILE_SIZE_BYTES) {
             throw new InvalidAudioFileException("파일 용량이 25MB를 초과합니다.");
+        }
+    }
+
+    private String writeResultJson(AudioAnalysisResult result) {
+        try {
+            return OBJECT_MAPPER.writeValueAsString(result);
+        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+            throw new UncheckedIOException(new IOException(e));
         }
     }
 }
