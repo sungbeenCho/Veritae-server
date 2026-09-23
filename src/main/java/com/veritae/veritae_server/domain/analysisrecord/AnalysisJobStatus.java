@@ -1,4 +1,4 @@
-package com.veritae.veritae_server.domain.analysisjob;
+package com.veritae.veritae_server.domain.analysisrecord;
 
 public enum AnalysisJobStatus {
     PENDING,

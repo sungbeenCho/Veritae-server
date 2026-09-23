@@ -4,8 +4,8 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.veritae.veritae_server.detection.VideoAnalysisResult;
 import com.veritae.veritae_server.detection.VideoDetectionClient;
-import com.veritae.veritae_server.domain.analysisjob.AnalysisJob;
-import com.veritae.veritae_server.domain.analysisjob.AnalysisJobRepository;
+import com.veritae.veritae_server.domain.analysisrecord.AnalysisRecord;
+import com.veritae.veritae_server.domain.analysisrecord.AnalysisRecordRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Async;
@@ -32,35 +32,37 @@ public class VideoAnalysisAsyncWorker {
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
     private final VideoDetectionClient videoDetectionClient;
-    private final AnalysisJobRepository analysisJobRepository;
+    private final AnalysisRecordRepository analysisRecordRepository;
 
     @Async("videoAnalysisExecutor")
     public void process(UUID jobId, byte[] videoBytes, String filename, String contentType) {
-        AnalysisJob job = analysisJobRepository.findById(jobId)
+        AnalysisRecord record = analysisRecordRepository.findById(jobId)
                 .orElseThrow(() -> new IllegalStateException("방금 생성한 job을 찾을 수 없습니다: " + jobId));
-        job.markProcessing();
-        analysisJobRepository.save(job);
+        record.markProcessing();
+        analysisRecordRepository.save(record);
 
         try {
             VideoAnalysisResult result = videoDetectionClient.detectVideo(videoBytes, filename, contentType);
+            Double aiScore = result.aiDetection() != null ? result.aiDetection().score() : null;
+            Double scamScore = result.scamDetection() != null ? result.scamDetection().score() : null;
             if (result.errorCode() != null) {
                 // 얼굴없음처럼 일부 판독만 정상적으로 비어있는 경우 - 사기감지 등 나머지 결과가
                 // 살아있을 수 있으니 전체 실패가 아니라 부분 성공(COMPLETED)으로 기록한다(2026-09-21,
                 // 예전엔 이것도 통째로 FAILED 처리돼서 살아있는 사기감지 결과까지 같이 버려졌었음).
                 log.info("영상 분석: 일부 판독 불가 jobId={} errorCode={}", jobId, result.errorCode());
-                job.markCompletedWithPartialError(
-                        writeResultJson(result), result.errorCode(), errorMessageFor(result.errorCode()));
+                record.markCompletedWithPartialError(
+                        writeResultJson(result), aiScore, scamScore, result.errorCode(), errorMessageFor(result.errorCode()));
             } else {
-                job.markCompleted(writeResultJson(result));
+                record.markCompleted(writeResultJson(result), aiScore, scamScore);
             }
         } catch (Exception e) {
             // 탐지 서버(Python)가 던지는 원문 에러 메시지에는 내부 경로/traceback 일부가 섞여 나올 수 있어
             // 클라이언트(errorMessage)에 그대로 노출하지 않는다. 상세 원인은 로그에만 남기고,
             // 사용자에게는 일반화된 메시지만 전달한다.
             log.error("영상 분석 실패 jobId={}", jobId, e);
-            job.markFailed("ANALYSIS_FAILED", "영상 분석 중 오류가 발생했습니다.");
+            record.markFailed("ANALYSIS_FAILED", "영상 분석 중 오류가 발생했습니다.");
         }
-        analysisJobRepository.save(job);
+        analysisRecordRepository.save(record);
     }
 
     private String errorMessageFor(String errorCode) {

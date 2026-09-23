@@ -2,9 +2,9 @@ package com.veritae.veritae_server.analysis;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.veritae.veritae_server.detection.VideoAnalysisResult;
-import com.veritae.veritae_server.domain.analysisjob.AnalysisJob;
-import com.veritae.veritae_server.domain.analysisjob.AnalysisJobRepository;
-import com.veritae.veritae_server.domain.analysisjob.AnalysisJobStatus;
+import com.veritae.veritae_server.domain.analysisrecord.AnalysisRecord;
+import com.veritae.veritae_server.domain.analysisrecord.AnalysisRecordRepository;
+import com.veritae.veritae_server.domain.analysisrecord.AnalysisJobStatus;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
@@ -32,7 +32,7 @@ public class VideoAnalysisService {
     // 자동 등록되지 않으므로, DI 대신 기본 설정 인스턴스를 직접 만들어 쓴다.
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
-    private final AnalysisJobRepository analysisJobRepository;
+    private final AnalysisRecordRepository analysisRecordRepository;
     private final VideoAnalysisAsyncWorker videoAnalysisAsyncWorker;
 
     public UUID submitVideo(MultipartFile file, UUID memberId) {
@@ -44,24 +44,24 @@ public class VideoAnalysisService {
             throw new UncheckedIOException("업로드된 파일을 읽을 수 없습니다.", e);
         }
 
-        AnalysisJob job = AnalysisJob.submit(memberId);
-        analysisJobRepository.save(job);
+        AnalysisRecord record = AnalysisRecord.submit(memberId);
+        analysisRecordRepository.save(record);
 
-        videoAnalysisAsyncWorker.process(job.getId(), videoBytes, file.getOriginalFilename(), file.getContentType());
-        return job.getId();
+        videoAnalysisAsyncWorker.process(record.getId(), videoBytes, file.getOriginalFilename(), file.getContentType());
+        return record.getId();
     }
 
     public AnalysisJobView getJob(UUID jobId, UUID requesterId) {
-        AnalysisJob job = analysisJobRepository.findById(jobId)
+        AnalysisRecord record = analysisRecordRepository.findById(jobId)
                 .orElseThrow(() -> new AnalysisJobNotFoundException(jobId));
-        if (!job.getMemberId().equals(requesterId)) {
+        if (!record.getMemberId().equals(requesterId)) {
             throw new AnalysisJobNotFoundException(jobId);
         }
 
-        VideoAnalysisResult result = job.getStatus() == AnalysisJobStatus.COMPLETED
-                ? readResultJson(job.getResultJson())
+        VideoAnalysisResult result = record.getStatus() == AnalysisJobStatus.COMPLETED
+                ? readResultJson(record.getResultJson())
                 : null;
-        return new AnalysisJobView(job.getId(), job.getStatus(), result, job.getErrorCode(), job.getErrorMessage());
+        return new AnalysisJobView(record.getId(), record.getStatus(), result, record.getErrorCode(), record.getErrorMessage());
     }
 
     private void validate(MultipartFile file) {

@@ -51,6 +51,9 @@ class AnalysisApiControllerTest {
     @MockitoBean
     private com.veritae.veritae_server.security.AuthenticatedMemberResolver authenticatedMemberResolver;
 
+    @MockitoBean
+    private com.veritae.veritae_server.analysis.AnalysisHistoryService analysisHistoryService;
+
     // JwtAuthenticationFilter 는 @Component(Filter) 라 @WebMvcTest 슬라이스에도 자동 등록되므로,
     // 그 의존성인 JwtTokenProvider 를 만족시켜야 컨텍스트가 뜬다.
     @MockitoBean
@@ -60,7 +63,9 @@ class AnalysisApiControllerTest {
     @WithMockUser
     void analyzeImage_withAuthenticatedMemberAndValidFile_shouldReturn200WithScore() throws Exception {
         var file = new MockMultipartFile("file", "test.jpg", "image/jpeg", "fake-bytes".getBytes());
-        when(imageAnalysisService.analyzeImage(any()))
+        java.util.UUID memberId = java.util.UUID.randomUUID();
+        when(authenticatedMemberResolver.currentMemberId()).thenReturn(memberId);
+        when(imageAnalysisService.analyzeImage(any(), any()))
                 .thenReturn(new ImageAnalysisResult(new ImageDetectionResult("spai", 0.87, null), null));
 
         mockMvc.perform(multipart("/api/v1/analysis/image").file(file))
@@ -73,8 +78,10 @@ class AnalysisApiControllerTest {
     @WithMockUser
     void analyzeImage_withScamDetection_shouldIncludeScamDetectionInResponse() throws Exception {
         var file = new MockMultipartFile("file", "test.jpg", "image/jpeg", "fake-bytes".getBytes());
+        java.util.UUID memberId = java.util.UUID.randomUUID();
+        when(authenticatedMemberResolver.currentMemberId()).thenReturn(memberId);
         var scamDetection = new ScamDetectionResult("lilju", 0.82, List.of(new ScamEvidence("계좌번호를 알려주세요", 0.95)));
-        when(imageAnalysisService.analyzeImage(any()))
+        when(imageAnalysisService.analyzeImage(any(), any()))
                 .thenReturn(new ImageAnalysisResult(new ImageDetectionResult("spai", 0.87, null), scamDetection));
 
         mockMvc.perform(multipart("/api/v1/analysis/image").file(file))
@@ -95,7 +102,9 @@ class AnalysisApiControllerTest {
         // 운영 환경에서 실제 HTTP 요청 시에는 서블릿 컨테이너가 이 설정을 적용한다.
         byte[] largeContent = new byte[5 * 1024 * 1024]; // 5MB > Spring Boot 기본 max-file-size(1MB)
         var file = new MockMultipartFile("file", "test.jpg", "image/jpeg", largeContent);
-        when(imageAnalysisService.analyzeImage(any()))
+        java.util.UUID memberId = java.util.UUID.randomUUID();
+        when(authenticatedMemberResolver.currentMemberId()).thenReturn(memberId);
+        when(imageAnalysisService.analyzeImage(any(), any()))
                 .thenReturn(new ImageAnalysisResult(new ImageDetectionResult("spai", 0.87, null), null));
 
         mockMvc.perform(multipart("/api/v1/analysis/image").file(file))
@@ -114,7 +123,9 @@ class AnalysisApiControllerTest {
     @WithMockUser
     void analyzeAudio_withAuthenticatedMemberAndValidFile_shouldReturn200WithScoreAndEvidence() throws Exception {
         var file = new MockMultipartFile("file", "test.wav", "audio/wav", "fake-bytes".getBytes());
-        when(audioAnalysisService.analyzeAudio(any())).thenReturn(new AudioAnalysisResult(new AudioDetectionResult(
+        java.util.UUID memberId = java.util.UUID.randomUUID();
+        when(authenticatedMemberResolver.currentMemberId()).thenReturn(memberId);
+        when(audioAnalysisService.analyzeAudio(any(), any())).thenReturn(new AudioAnalysisResult(new AudioDetectionResult(
                 "antideepfake", 0.87,
                 List.of(new Evidence(
                         "시간 구간 이상 패턴", "0.5초~1.2초 구간에서 합성 흔적이 감지됨",
@@ -167,7 +178,7 @@ class AnalysisApiControllerTest {
         when(videoAnalysisService.getJob(jobId, memberId)).thenReturn(
                 new com.veritae.veritae_server.analysis.AnalysisJobView(
                         jobId,
-                        com.veritae.veritae_server.domain.analysisjob.AnalysisJobStatus.COMPLETED,
+                        com.veritae.veritae_server.domain.analysisrecord.AnalysisJobStatus.COMPLETED,
                         new VideoAnalysisResult(new VideoDetectionResult("dfdc", 0.91,
                                 List.of(new Evidence("얼굴 조작 의심 구간", "3.0초~7.0초 구간에서 얼굴 합성 흔적이 감지됨",
                                         List.of("temporal", "face-swap"), 3.0, 7.0)),
@@ -198,7 +209,7 @@ class AnalysisApiControllerTest {
         when(videoAnalysisService.getJob(jobId, memberId)).thenReturn(
                 new com.veritae.veritae_server.analysis.AnalysisJobView(
                         jobId,
-                        com.veritae.veritae_server.domain.analysisjob.AnalysisJobStatus.COMPLETED,
+                        com.veritae.veritae_server.domain.analysisrecord.AnalysisJobStatus.COMPLETED,
                         new VideoAnalysisResult(null, scamDetection, "NO_FACE_DETECTED"),
                         "NO_FACE_DETECTED",
                         "영상에서 얼굴을 찾을 수 없어 AI판독은 제공되지 않습니다."));
@@ -229,6 +240,56 @@ class AnalysisApiControllerTest {
         java.util.UUID jobId = java.util.UUID.randomUUID();
 
         mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/v1/analysis/jobs/" + jobId))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @WithMockUser
+    void getAnalysisRecords_withAuthenticatedMember_shouldReturn200WithPagedContent() throws Exception {
+        java.util.UUID memberId = java.util.UUID.randomUUID();
+        when(authenticatedMemberResolver.currentMemberId()).thenReturn(memberId);
+        var objectMapper = new com.fasterxml.jackson.databind.ObjectMapper();
+        var result = new ImageAnalysisResult(new ImageDetectionResult("spai", 0.1, null), null);
+        var record = com.veritae.veritae_server.domain.analysisrecord.AnalysisRecord.completedSync(
+                memberId, com.veritae.veritae_server.domain.analysisrecord.Modality.IMAGE,
+                objectMapper.writeValueAsString(result), 0.1, null);
+        var page = new org.springframework.data.domain.PageImpl<>(List.of(record));
+        when(analysisHistoryService.getRecords(memberId, 0, 10)).thenReturn(page);
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                        .get("/api/v1/analysis/records"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].modality").value("IMAGE"))
+                .andExpect(jsonPath("$.content[0].imageDetection.model").value("spai"))
+                .andExpect(jsonPath("$.totalElements").value(1));
+    }
+
+    @Test
+    void getAnalysisRecords_withoutAuthentication_shouldReturn401() throws Exception {
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                        .get("/api/v1/analysis/records"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @WithMockUser
+    void getAnalysisReport_withAuthenticatedMember_shouldReturn200WithCounts() throws Exception {
+        java.util.UUID memberId = java.util.UUID.randomUUID();
+        when(authenticatedMemberResolver.currentMemberId()).thenReturn(memberId);
+        when(analysisHistoryService.getReport(memberId)).thenReturn(
+                new com.veritae.veritae_server.analysis.AnalysisHistoryService.AnalysisReportView(23, 10, 8, 5, 3, 2));
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                        .get("/api/v1/analysis/report"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalCount").value(23))
+                .andExpect(jsonPath("$.scamDetectedCount").value(2));
+    }
+
+    @Test
+    void getAnalysisReport_withoutAuthentication_shouldReturn401() throws Exception {
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                        .get("/api/v1/analysis/report"))
                 .andExpect(status().isUnauthorized());
     }
 }

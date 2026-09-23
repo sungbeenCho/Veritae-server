@@ -1,8 +1,8 @@
 package com.veritae.veritae_server.analysis;
 
-import com.veritae.veritae_server.domain.analysisjob.AnalysisJob;
-import com.veritae.veritae_server.domain.analysisjob.AnalysisJobRepository;
-import com.veritae.veritae_server.domain.analysisjob.AnalysisJobStatus;
+import com.veritae.veritae_server.domain.analysisrecord.AnalysisRecord;
+import com.veritae.veritae_server.domain.analysisrecord.AnalysisRecordRepository;
+import com.veritae.veritae_server.domain.analysisrecord.AnalysisJobStatus;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -24,25 +24,25 @@ import static org.mockito.Mockito.when;
 class StaleAnalysisJobCleanerTest {
 
     @Mock
-    private AnalysisJobRepository analysisJobRepository;
+    private AnalysisRecordRepository analysisRecordRepository;
 
     @Captor
-    private ArgumentCaptor<List<AnalysisJob>> savedJobsCaptor;
+    private ArgumentCaptor<List<AnalysisRecord>> savedJobsCaptor;
 
     private StaleAnalysisJobCleaner cleaner;
 
     @BeforeEach
     void setUp() {
-        cleaner = new StaleAnalysisJobCleaner(analysisJobRepository);
+        cleaner = new StaleAnalysisJobCleaner(analysisRecordRepository);
     }
 
     @Test
     void cleanUpStaleJobs_withPendingAndProcessingJobs_shouldMarkThemFailed() {
         // Given
-        AnalysisJob pendingJob = AnalysisJob.submit(UUID.randomUUID());
-        AnalysisJob processingJob = AnalysisJob.submit(UUID.randomUUID());
+        AnalysisRecord pendingJob = AnalysisRecord.submit(UUID.randomUUID());
+        AnalysisRecord processingJob = AnalysisRecord.submit(UUID.randomUUID());
         processingJob.markProcessing();
-        when(analysisJobRepository.findByStatusIn(
+        when(analysisRecordRepository.findByStatusIn(
                 List.of(AnalysisJobStatus.PENDING, AnalysisJobStatus.PROCESSING)))
                 .thenReturn(List.of(pendingJob, processingJob));
 
@@ -50,8 +50,8 @@ class StaleAnalysisJobCleanerTest {
         cleaner.cleanUpStaleJobs();
 
         // Then
-        verify(analysisJobRepository).saveAll(savedJobsCaptor.capture());
-        List<AnalysisJob> savedJobs = savedJobsCaptor.getValue();
+        verify(analysisRecordRepository).saveAll(savedJobsCaptor.capture());
+        List<AnalysisRecord> savedJobs = savedJobsCaptor.getValue();
         assertThat(savedJobs).hasSize(2);
         assertThat(savedJobs).allSatisfy(job -> {
             assertThat(job.getStatus()).isEqualTo(AnalysisJobStatus.FAILED);
@@ -63,7 +63,7 @@ class StaleAnalysisJobCleanerTest {
     @Test
     void cleanUpStaleJobs_withNoStaleJobs_shouldNotSaveAnything() {
         // Given
-        when(analysisJobRepository.findByStatusIn(
+        when(analysisRecordRepository.findByStatusIn(
                 List.of(AnalysisJobStatus.PENDING, AnalysisJobStatus.PROCESSING)))
                 .thenReturn(List.of());
 
@@ -71,19 +71,19 @@ class StaleAnalysisJobCleanerTest {
         cleaner.cleanUpStaleJobs();
 
         // Then
-        verify(analysisJobRepository, never()).saveAll(org.mockito.ArgumentMatchers.any());
+        verify(analysisRecordRepository, never()).saveAll(org.mockito.ArgumentMatchers.any());
     }
 
     @Test
     void cleanUpStaleJobs_shouldOnlyQueryPendingAndProcessingStatuses() {
         // Given: COMPLETED/FAILED 상태는 findByStatusIn 호출 조건에 포함되지 않아야 한다
-        when(analysisJobRepository.findByStatusIn(eq(List.of(AnalysisJobStatus.PENDING, AnalysisJobStatus.PROCESSING))))
+        when(analysisRecordRepository.findByStatusIn(eq(List.of(AnalysisJobStatus.PENDING, AnalysisJobStatus.PROCESSING))))
                 .thenReturn(List.of());
 
         // When
         cleaner.cleanUpStaleJobs();
 
         // Then
-        verify(analysisJobRepository).findByStatusIn(List.of(AnalysisJobStatus.PENDING, AnalysisJobStatus.PROCESSING));
+        verify(analysisRecordRepository).findByStatusIn(List.of(AnalysisJobStatus.PENDING, AnalysisJobStatus.PROCESSING));
     }
 }
