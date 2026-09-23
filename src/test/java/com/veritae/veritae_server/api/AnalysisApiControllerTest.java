@@ -60,7 +60,9 @@ class AnalysisApiControllerTest {
     @WithMockUser
     void analyzeImage_withAuthenticatedMemberAndValidFile_shouldReturn200WithScore() throws Exception {
         var file = new MockMultipartFile("file", "test.jpg", "image/jpeg", "fake-bytes".getBytes());
-        when(imageAnalysisService.analyzeImage(any()))
+        java.util.UUID memberId = java.util.UUID.randomUUID();
+        when(authenticatedMemberResolver.currentMemberId()).thenReturn(memberId);
+        when(imageAnalysisService.analyzeImage(any(), any()))
                 .thenReturn(new ImageAnalysisResult(new ImageDetectionResult("spai", 0.87, null), null));
 
         mockMvc.perform(multipart("/api/v1/analysis/image").file(file))
@@ -73,8 +75,10 @@ class AnalysisApiControllerTest {
     @WithMockUser
     void analyzeImage_withScamDetection_shouldIncludeScamDetectionInResponse() throws Exception {
         var file = new MockMultipartFile("file", "test.jpg", "image/jpeg", "fake-bytes".getBytes());
+        java.util.UUID memberId = java.util.UUID.randomUUID();
+        when(authenticatedMemberResolver.currentMemberId()).thenReturn(memberId);
         var scamDetection = new ScamDetectionResult("lilju", 0.82, List.of(new ScamEvidence("계좌번호를 알려주세요", 0.95)));
-        when(imageAnalysisService.analyzeImage(any()))
+        when(imageAnalysisService.analyzeImage(any(), any()))
                 .thenReturn(new ImageAnalysisResult(new ImageDetectionResult("spai", 0.87, null), scamDetection));
 
         mockMvc.perform(multipart("/api/v1/analysis/image").file(file))
@@ -95,7 +99,9 @@ class AnalysisApiControllerTest {
         // 운영 환경에서 실제 HTTP 요청 시에는 서블릿 컨테이너가 이 설정을 적용한다.
         byte[] largeContent = new byte[5 * 1024 * 1024]; // 5MB > Spring Boot 기본 max-file-size(1MB)
         var file = new MockMultipartFile("file", "test.jpg", "image/jpeg", largeContent);
-        when(imageAnalysisService.analyzeImage(any()))
+        java.util.UUID memberId = java.util.UUID.randomUUID();
+        when(authenticatedMemberResolver.currentMemberId()).thenReturn(memberId);
+        when(imageAnalysisService.analyzeImage(any(), any()))
                 .thenReturn(new ImageAnalysisResult(new ImageDetectionResult("spai", 0.87, null), null));
 
         mockMvc.perform(multipart("/api/v1/analysis/image").file(file))

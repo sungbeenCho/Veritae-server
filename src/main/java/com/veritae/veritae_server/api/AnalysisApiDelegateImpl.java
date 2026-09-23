@@ -28,7 +28,8 @@ public class AnalysisApiDelegateImpl implements AnalysisApiDelegate {
 
     @Override
     public ResponseEntity<ImageAnalysisResponse> analyzeImage(MultipartFile file) {
-        var result = imageAnalysisService.analyzeImage(file);
+        UUID memberId = authenticatedMemberResolver.currentMemberId();
+        var result = imageAnalysisService.analyzeImage(file, memberId);
         return ResponseEntity.ok(AnalysisApiMapper.toResponse(result));
     }
 
