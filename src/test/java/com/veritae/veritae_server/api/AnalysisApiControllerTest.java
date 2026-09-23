@@ -239,4 +239,57 @@ class AnalysisApiControllerTest {
         mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/v1/analysis/jobs/" + jobId))
                 .andExpect(status().isUnauthorized());
     }
+
+    @MockitoBean
+    private com.veritae.veritae_server.analysis.AnalysisHistoryService analysisHistoryService;
+
+    @Test
+    @WithMockUser
+    void getAnalysisRecords_withAuthenticatedMember_shouldReturn200WithPagedContent() throws Exception {
+        java.util.UUID memberId = java.util.UUID.randomUUID();
+        when(authenticatedMemberResolver.currentMemberId()).thenReturn(memberId);
+        var objectMapper = new com.fasterxml.jackson.databind.ObjectMapper();
+        var result = new ImageAnalysisResult(new ImageDetectionResult("spai", 0.1, null), null);
+        var record = com.veritae.veritae_server.domain.analysisrecord.AnalysisRecord.completedSync(
+                memberId, com.veritae.veritae_server.domain.analysisrecord.Modality.IMAGE,
+                objectMapper.writeValueAsString(result), 0.1, null);
+        var page = new org.springframework.data.domain.PageImpl<>(List.of(record));
+        when(analysisHistoryService.getRecords(memberId, 0, 10)).thenReturn(page);
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                        .get("/api/v1/analysis/records"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].modality").value("IMAGE"))
+                .andExpect(jsonPath("$.content[0].imageDetection.model").value("spai"))
+                .andExpect(jsonPath("$.totalElements").value(1));
+    }
+
+    @Test
+    void getAnalysisRecords_withoutAuthentication_shouldReturn401() throws Exception {
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                        .get("/api/v1/analysis/records"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @WithMockUser
+    void getAnalysisReport_withAuthenticatedMember_shouldReturn200WithCounts() throws Exception {
+        java.util.UUID memberId = java.util.UUID.randomUUID();
+        when(authenticatedMemberResolver.currentMemberId()).thenReturn(memberId);
+        when(analysisHistoryService.getReport(memberId)).thenReturn(
+                new com.veritae.veritae_server.analysis.AnalysisHistoryService.AnalysisReportView(23, 10, 8, 5, 3, 2));
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                        .get("/api/v1/analysis/report"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalCount").value(23))
+                .andExpect(jsonPath("$.scamDetectedCount").value(2));
+    }
+
+    @Test
+    void getAnalysisReport_withoutAuthentication_shouldReturn401() throws Exception {
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                        .get("/api/v1/analysis/report"))
+                .andExpect(status().isUnauthorized());
+    }
 }
