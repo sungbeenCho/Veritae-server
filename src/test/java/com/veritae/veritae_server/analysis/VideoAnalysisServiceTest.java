@@ -2,9 +2,9 @@ package com.veritae.veritae_server.analysis;
 
 import com.veritae.veritae_server.detection.VideoAnalysisResult;
 import com.veritae.veritae_server.detection.VideoDetectionResult;
-import com.veritae.veritae_server.domain.analysisjob.AnalysisJob;
-import com.veritae.veritae_server.domain.analysisjob.AnalysisJobRepository;
-import com.veritae.veritae_server.domain.analysisjob.AnalysisJobStatus;
+import com.veritae.veritae_server.domain.analysisrecord.AnalysisRecord;
+import com.veritae.veritae_server.domain.analysisrecord.AnalysisRecordRepository;
+import com.veritae.veritae_server.domain.analysisrecord.AnalysisJobStatus;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -27,7 +27,7 @@ import static org.mockito.Mockito.when;
 class VideoAnalysisServiceTest {
 
     @Mock
-    private AnalysisJobRepository analysisJobRepository;
+    private AnalysisRecordRepository analysisRecordRepository;
 
     @Mock
     private VideoAnalysisAsyncWorker videoAnalysisAsyncWorker;
@@ -38,7 +38,7 @@ class VideoAnalysisServiceTest {
 
     @BeforeEach
     void setUp() {
-        videoAnalysisService = new VideoAnalysisService(analysisJobRepository, videoAnalysisAsyncWorker);
+        videoAnalysisService = new VideoAnalysisService(analysisRecordRepository, videoAnalysisAsyncWorker);
     }
 
     @Test
@@ -52,7 +52,7 @@ class VideoAnalysisServiceTest {
 
         // Then
         assertThat(jobId).isNotNull();
-        verify(analysisJobRepository).save(any(AnalysisJob.class));
+        verify(analysisRecordRepository).save(any(AnalysisRecord.class));
         verify(videoAnalysisAsyncWorker).process(org.mockito.ArgumentMatchers.eq(jobId), any(), org.mockito.ArgumentMatchers.eq("test.mp4"), org.mockito.ArgumentMatchers.eq("video/mp4"));
     }
 
@@ -64,7 +64,7 @@ class VideoAnalysisServiceTest {
         // When / Then
         assertThatThrownBy(() -> videoAnalysisService.submitVideo(file, UUID.randomUUID()))
                 .isInstanceOf(InvalidVideoFileException.class);
-        verifyNoInteractions(analysisJobRepository, videoAnalysisAsyncWorker);
+        verifyNoInteractions(analysisRecordRepository, videoAnalysisAsyncWorker);
     }
 
     @Test
@@ -75,7 +75,7 @@ class VideoAnalysisServiceTest {
         // When / Then
         assertThatThrownBy(() -> videoAnalysisService.submitVideo(file, UUID.randomUUID()))
                 .isInstanceOf(InvalidVideoFileException.class);
-        verifyNoInteractions(analysisJobRepository, videoAnalysisAsyncWorker);
+        verifyNoInteractions(analysisRecordRepository, videoAnalysisAsyncWorker);
     }
 
     @Test
@@ -86,7 +86,7 @@ class VideoAnalysisServiceTest {
         // When / Then
         assertThatThrownBy(() -> videoAnalysisService.submitVideo(file, UUID.randomUUID()))
                 .isInstanceOf(InvalidVideoFileException.class);
-        verifyNoInteractions(analysisJobRepository, videoAnalysisAsyncWorker);
+        verifyNoInteractions(analysisRecordRepository, videoAnalysisAsyncWorker);
     }
 
     @Test
@@ -98,17 +98,17 @@ class VideoAnalysisServiceTest {
         // When / Then
         assertThatThrownBy(() -> videoAnalysisService.submitVideo(file, UUID.randomUUID()))
                 .isInstanceOf(InvalidVideoFileException.class);
-        verifyNoInteractions(analysisJobRepository, videoAnalysisAsyncWorker);
+        verifyNoInteractions(analysisRecordRepository, videoAnalysisAsyncWorker);
     }
 
     @Test
     void getJob_withOwnCompletedJob_shouldReturnViewWithDeserializedResult() throws Exception {
         // Given
         UUID memberId = UUID.randomUUID();
-        AnalysisJob job = AnalysisJob.submit(memberId);
+        AnalysisRecord job = AnalysisRecord.submit(memberId);
         job.markCompleted(objectMapper.writeValueAsString(
-                new VideoAnalysisResult(new VideoDetectionResult("dfdc", 0.91, List.of(), null), null, null)));
-        when(analysisJobRepository.findById(job.getId())).thenReturn(Optional.of(job));
+                new VideoAnalysisResult(new VideoDetectionResult("dfdc", 0.91, List.of(), null), null, null)), 0.91, null);
+        when(analysisRecordRepository.findById(job.getId())).thenReturn(Optional.of(job));
 
         // When
         AnalysisJobView view = videoAnalysisService.getJob(job.getId(), memberId);
@@ -124,8 +124,8 @@ class VideoAnalysisServiceTest {
     void getJob_withPendingJob_shouldReturnViewWithNullResult() {
         // Given
         UUID memberId = UUID.randomUUID();
-        AnalysisJob job = AnalysisJob.submit(memberId);
-        when(analysisJobRepository.findById(job.getId())).thenReturn(Optional.of(job));
+        AnalysisRecord job = AnalysisRecord.submit(memberId);
+        when(analysisRecordRepository.findById(job.getId())).thenReturn(Optional.of(job));
 
         // When
         AnalysisJobView view = videoAnalysisService.getJob(job.getId(), memberId);
@@ -139,7 +139,7 @@ class VideoAnalysisServiceTest {
     void getJob_withNonExistentJob_shouldThrowAnalysisJobNotFoundException() {
         // Given
         UUID jobId = UUID.randomUUID();
-        when(analysisJobRepository.findById(jobId)).thenReturn(Optional.empty());
+        when(analysisRecordRepository.findById(jobId)).thenReturn(Optional.empty());
 
         // When / Then
         assertThatThrownBy(() -> videoAnalysisService.getJob(jobId, UUID.randomUUID()))
@@ -149,8 +149,8 @@ class VideoAnalysisServiceTest {
     @Test
     void getJob_withAnotherMembersJob_shouldThrowAnalysisJobNotFoundException() {
         // Given
-        AnalysisJob job = AnalysisJob.submit(UUID.randomUUID());
-        when(analysisJobRepository.findById(job.getId())).thenReturn(Optional.of(job));
+        AnalysisRecord job = AnalysisRecord.submit(UUID.randomUUID());
+        when(analysisRecordRepository.findById(job.getId())).thenReturn(Optional.of(job));
 
         // When / Then: 요청자가 소유자가 아님
         assertThatThrownBy(() -> videoAnalysisService.getJob(job.getId(), UUID.randomUUID()))

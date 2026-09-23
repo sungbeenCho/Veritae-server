@@ -1,8 +1,8 @@
 package com.veritae.veritae_server.analysis;
 
-import com.veritae.veritae_server.domain.analysisjob.AnalysisJob;
-import com.veritae.veritae_server.domain.analysisjob.AnalysisJobRepository;
-import com.veritae.veritae_server.domain.analysisjob.AnalysisJobStatus;
+import com.veritae.veritae_server.domain.analysisrecord.AnalysisRecord;
+import com.veritae.veritae_server.domain.analysisrecord.AnalysisRecordRepository;
+import com.veritae.veritae_server.domain.analysisrecord.AnalysisJobStatus;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
@@ -25,11 +25,11 @@ public class StaleAnalysisJobCleaner {
 
     private static final String STALE_JOB_ERROR_MESSAGE = "서버 재시작으로 처리가 중단됐습니다.";
 
-    private final AnalysisJobRepository analysisJobRepository;
+    private final AnalysisRecordRepository analysisRecordRepository;
 
     @EventListener(ApplicationReadyEvent.class)
     public void cleanUpStaleJobs() {
-        List<AnalysisJob> staleJobs = analysisJobRepository.findByStatusIn(
+        List<AnalysisRecord> staleJobs = analysisRecordRepository.findByStatusIn(
                 List.of(AnalysisJobStatus.PENDING, AnalysisJobStatus.PROCESSING));
 
         if (staleJobs.isEmpty()) {
@@ -38,9 +38,9 @@ public class StaleAnalysisJobCleaner {
 
         log.warn("서버 재시작 직전 PENDING/PROCESSING 상태로 남아있던 영상 분석 job {}건을 FAILED로 정리합니다.",
                 staleJobs.size());
-        for (AnalysisJob job : staleJobs) {
-            job.markFailed("ANALYSIS_FAILED", STALE_JOB_ERROR_MESSAGE);
+        for (AnalysisRecord record : staleJobs) {
+            record.markFailed("ANALYSIS_FAILED", STALE_JOB_ERROR_MESSAGE);
         }
-        analysisJobRepository.saveAll(staleJobs);
+        analysisRecordRepository.saveAll(staleJobs);
     }
 }

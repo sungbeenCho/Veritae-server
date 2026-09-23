@@ -167,7 +167,7 @@ class AnalysisApiControllerTest {
         when(videoAnalysisService.getJob(jobId, memberId)).thenReturn(
                 new com.veritae.veritae_server.analysis.AnalysisJobView(
                         jobId,
-                        com.veritae.veritae_server.domain.analysisjob.AnalysisJobStatus.COMPLETED,
+                        com.veritae.veritae_server.domain.analysisrecord.AnalysisJobStatus.COMPLETED,
                         new VideoAnalysisResult(new VideoDetectionResult("dfdc", 0.91,
                                 List.of(new Evidence("얼굴 조작 의심 구간", "3.0초~7.0초 구간에서 얼굴 합성 흔적이 감지됨",
                                         List.of("temporal", "face-swap"), 3.0, 7.0)),
@@ -198,7 +198,7 @@ class AnalysisApiControllerTest {
         when(videoAnalysisService.getJob(jobId, memberId)).thenReturn(
                 new com.veritae.veritae_server.analysis.AnalysisJobView(
                         jobId,
-                        com.veritae.veritae_server.domain.analysisjob.AnalysisJobStatus.COMPLETED,
+                        com.veritae.veritae_server.domain.analysisrecord.AnalysisJobStatus.COMPLETED,
                         new VideoAnalysisResult(null, scamDetection, "NO_FACE_DETECTED"),
                         "NO_FACE_DETECTED",
                         "영상에서 얼굴을 찾을 수 없어 AI판독은 제공되지 않습니다."));

@@ -48,6 +48,10 @@ dependencies {
 	runtimeOnly 'com.mysql:mysql-connector-j'
 	annotationProcessor 'org.projectlombok:lombok'
 	testImplementation 'org.springframework.boot:spring-boot-starter-data-jpa-test'
+	// @DataJpaTest가 내장 임베디드 DB로 교체를 시도하는데, 런타임엔 MySQL만 있어서 테스트 클래스패스에
+	// 임베디드 DB가 없으면 "Failed to replace DataSource with an embedded database" 로 컨텍스트 로딩이
+	// 실패한다(AnalysisRecordRepositoryTest, 2026-09-23 실측 확인).
+	testRuntimeOnly 'com.h2database:h2'
 	testImplementation 'org.springframework.boot:spring-boot-starter-security-test'
 	testImplementation 'org.springframework.boot:spring-boot-starter-validation-test'
 	testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'

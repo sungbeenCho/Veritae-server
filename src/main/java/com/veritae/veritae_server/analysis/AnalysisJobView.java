@@ -1,7 +1,7 @@
 package com.veritae.veritae_server.analysis;
 
 import com.veritae.veritae_server.detection.VideoAnalysisResult;
-import com.veritae.veritae_server.domain.analysisjob.AnalysisJobStatus;
+import com.veritae.veritae_server.domain.analysisrecord.AnalysisJobStatus;
 
 import java.util.UUID;
 
