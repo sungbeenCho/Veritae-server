@@ -15,7 +15,7 @@ tags:
   - name: Members
     description: 회원 정보 조회
   - name: Analysis
-    description: 이미지 AI 생성 여부 분석
+    description: 이미지/음성/영상 AI 생성 여부 및 사기 위험도 분석, 분석 기록/리포트 조회
 
 paths:
   /api/v1/auth/signup:

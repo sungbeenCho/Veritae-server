@@ -503,18 +503,17 @@ pdf.endpoint(
             "{",
             '  "aiDetection": {',
             '    "model": "spai",',
-            '    "score": 0.000134,',
-            '    "evidenceImage": null',
-            "  },",
-            '  "scamDetection": null',
+            '    "score": 0.000134',
+            "  }",
             "}",
         ]),
     ],
     resp_note=(
-        "evidenceImage: 판독 근거 히트맵(base64 PNG). 이미지의 어느 부분이 의심스러운지 시각적으로 "
-        "보여준다(best-effort - 실패하면 null). scamDetection: 이미지에서 텍스트가 추출되면 그 내용의 "
-        "사기 위험도(model/score/evidence)를 채워 반환하고, 텍스트가 전혀 없으면 null이다 - 이 필드가 "
-        "null이면 항상 '텍스트가 없었다'는 뜻이며, 사기감지 파이프라인 자체가 실패한 경우는 null로 "
+        "null인 필드는 응답 JSON에 키 자체가 나오지 않는다(2026-09-23 정책 - 예: 이 케이스의 scamDetection, "
+        "evidenceImage). evidenceImage: 판독 근거 히트맵(base64 PNG). 이미지의 어느 부분이 의심스러운지 "
+        "시각적으로 보여준다(best-effort - 실패하면 필드 자체가 빠짐). scamDetection: 이미지에서 텍스트가 "
+        "추출되면 그 내용의 사기 위험도(model/score/evidence)를 채워 반환하고, 텍스트가 전혀 없으면 필드가 "
+        "빠진다 - 이 필드가 없으면 항상 '텍스트가 없었다'는 뜻이며, 사기감지 파이프라인 자체가 실패한 경우는 "
         "조용히 넘어가지 않고 502로 요청 전체가 실패한다(아래 상태 코드의 502 참고, 2026-09-22 정책)."
     ),
     status_codes=[
@@ -566,15 +565,15 @@ pdf.endpoint(
             '    "model": "antideepfake",',
             '    "score": 0.0018,',
             '    "evidence": []',
-            "  },",
-            '  "scamDetection": null',
+            "  }",
             "}",
         ]),
     ],
     resp_note=(
+        "null인 필드는 응답 JSON에 키 자체가 나오지 않는다(2026-09-23 정책 - 예: 이 케이스의 scamDetection). "
         "scamDetection: 음성에서 텍스트(발화)가 추출되면 그 내용의 사기 위험도를 채워 반환하고, 발화가 "
-        "전혀 없으면 null이다 - 이 필드가 null이면 항상 '텍스트가 없었다'는 뜻이며, 사기감지 파이프라인 "
-        "자체가 실패한 경우는 null로 조용히 넘어가지 않고 502로 요청 전체가 실패한다(2026-09-22 정책)."
+        "전혀 없으면 필드가 빠진다 - 이 필드가 없으면 항상 '텍스트가 없었다'는 뜻이며, 사기감지 파이프라인 "
+        "자체가 실패한 경우는 조용히 넘어가지 않고 502로 요청 전체가 실패한다(2026-09-22 정책)."
     ),
     status_codes=[
         "200 OK",
@@ -617,11 +616,7 @@ pdf.endpoint(
         ("진행 중", [
             "{",
             '  "jobId": "11111111-1111-1111-1111-111111111111",',
-            '  "status": "PROCESSING",',
-            '  "aiDetection": null,',
-            '  "scamDetection": null,',
-            '  "errorCode": null,',
-            '  "errorMessage": null',
+            '  "status": "PROCESSING"',
             "}",
         ]),
         ("완료 - 얼굴판독/사기감지 둘 다 성공", [
@@ -651,16 +646,13 @@ pdf.endpoint(
             '        "score": 0.95',
             "      }",
             "    ]",
-            "  },",
-            '  "errorCode": null,',
-            '  "errorMessage": null',
+            "  }",
             "}",
         ]),
         ("완료 - 얼굴없음(AI판독 불가), 사기감지는 성공", [
             "{",
             '  "jobId": "11111111-1111-1111-1111-111111111111",',
             '  "status": "COMPLETED",',
-            '  "aiDetection": null,',
             '  "scamDetection": {',
             '    "model": "lilju",',
             '    "score": 0.82,',
@@ -679,26 +671,143 @@ pdf.endpoint(
             "{",
             '  "jobId": "11111111-1111-1111-1111-111111111111",',
             '  "status": "FAILED",',
-            '  "aiDetection": null,',
-            '  "scamDetection": null,',
             '  "errorCode": "ANALYSIS_FAILED",',
             '  "errorMessage": "영상 분석 중 오류가 발생했습니다."',
             "}",
         ]),
     ],
     resp_note=(
-        "status: PENDING | PROCESSING | COMPLETED | FAILED. errorCode/errorMessage는 두 경우에 채워진다: "
-        "(1) status가 FAILED일 때 - 완전 실패 사유. (2) status가 COMPLETED인데 얼굴을 찾지 못해 "
-        "aiDetection만 비어있을 때 - 부분 사유(현재 값 NO_FACE_DETECTED). 즉 errorCode가 있다고 해서 "
-        "무조건 실패가 아니다 - status를 먼저 보고, COMPLETED면 aiDetection/scamDetection 각각 null "
-        "체크로 화면을 구성할 것(위 COMPLETED 예시 참고). FAILED일 때의 errorCode는 ANALYSIS_FAILED"
-        "(처리 자체 실패 - 같은 영상으로 재시도 가능)이다. errorMessage는 사용자에게 그대로 보여줄 문구로, "
-        "표현이 다듬어질 수 있어 분기 판단에는 절대 쓰지 말고 errorCode만 쓸 것."
+        "status: PENDING | PROCESSING | COMPLETED | FAILED. null인 필드는 응답 JSON에 키 자체가 나오지 "
+        "않는다(2026-09-23 정책 - 위 '진행 중' 예시처럼 status만 오고 나머지 필드는 다 빠질 수 있음). "
+        "errorCode/errorMessage는 두 경우에 채워진다: (1) status가 FAILED일 때 - 완전 실패 사유. "
+        "(2) status가 COMPLETED인데 얼굴을 찾지 못해 aiDetection만 비어있을 때 - 부분 사유(현재 값 "
+        "NO_FACE_DETECTED). 즉 errorCode가 있다고 해서 무조건 실패가 아니다 - status를 먼저 보고, "
+        "COMPLETED면 aiDetection/scamDetection 각각 존재 여부(필드가 있는지)로 화면을 구성할 것(위 "
+        "COMPLETED 예시 참고). FAILED일 때의 errorCode는 ANALYSIS_FAILED(처리 자체 실패 - 같은 영상으로 "
+        "재시도 가능)이다. errorMessage는 사용자에게 그대로 보여줄 문구로, 표현이 다듬어질 수 있어 분기 "
+        "판단에는 절대 쓰지 말고 errorCode만 쓸 것."
     ),
     status_codes=[
         "200 OK",
         "401 Unauthorized",
         "404 Not Found (작업 없음 또는 본인 소유 아님)",
+        "500 Internal Server Error",
+    ],
+)
+
+# ---- 9. 분석 기록 목록 조회 ----
+pdf.endpoint(
+    9, "분석 기록 목록 조회", "GET", "/api/v1/analysis/records",
+    "로그인한 회원이 완료한 분석(이미지/음성/영상) 기록을 최신순으로 최대 10건 반환. 페이지네이션은 "
+    "지원하지 않음 - 처리중/실패한 기록은 포함되지 않으며, 영상 진행 상태 확인은 8번 API를 사용",
+    req_params=["없음 (Authorization 헤더로 인증)"],
+    resp_lines=[
+        ("이미지 기록 - imageDetection만 채워짐", [
+            "{",
+            '  "content": [',
+            "    {",
+            '      "id": "11111111-1111-1111-1111-111111111111",',
+            '      "modality": "IMAGE",',
+            '      "createdAt": "2026-09-23T09:00:00Z",',
+            '      "imageDetection": {',
+            '        "model": "spai",',
+            '        "score": 0.87,',
+            '        "evidenceImage": "iVBORw0KGgoAAAANSUhEUgAA... (base64 PNG, 생략)"',
+            "      }",
+            "    }",
+            "  ]",
+            "}",
+        ]),
+        ("음성 기록 - audioDetection만 채워짐", [
+            "{",
+            '  "content": [',
+            "    {",
+            '      "id": "22222222-2222-2222-2222-222222222222",',
+            '      "modality": "AUDIO",',
+            '      "createdAt": "2026-09-23T08:30:00Z",',
+            '      "audioDetection": {',
+            '        "model": "antideepfake",',
+            '        "score": 0.73,',
+            '        "evidence": [',
+            "          {",
+            '            "title": "합성 음성 의심 구간",',
+            '            "description": "1.0초~4.0초 구간에서 부자연스러운 음성 합성 흔적이 감지됨",',
+            '            "tags": ["temporal"],',
+            '            "startSec": 1.0,',
+            '            "endSec": 4.0',
+            "          }",
+            "        ]",
+            "      },",
+            '      "scamDetection": {',
+            '        "model": "lilju",',
+            '        "score": 0.82,',
+            '        "evidence": [',
+            "          {",
+            '            "sentence": "지금 바로 계좌번호와 비밀번호를 알려주셔야 합니다.",',
+            '            "score": 0.95',
+            "          }",
+            "        ]",
+            "      }",
+            "    }",
+            "  ]",
+            "}",
+        ]),
+        ("영상 기록 - 얼굴 없음(videoDetection은 없지만 사기감지는 살아있음)", [
+            "{",
+            '  "content": [',
+            "    {",
+            '      "id": "33333333-3333-3333-3333-333333333333",',
+            '      "modality": "VIDEO",',
+            '      "createdAt": "2026-09-23T08:00:00Z",',
+            '      "scamDetection": {',
+            '        "model": "lilju",',
+            '        "score": 0.82,',
+            '        "evidence": [',
+            "          {",
+            '            "sentence": "지금 바로 계좌번호와 비밀번호를 알려주셔야 합니다.",',
+            '            "score": 0.95',
+            "          }",
+            "        ]",
+            "      },",
+            '      "errorCode": "NO_FACE_DETECTED"',
+            "    }",
+            "  ]",
+            "}",
+        ]),
+    ],
+    resp_note=(
+        "content 항목마다 modality에 맞는 detection 필드(imageDetection/audioDetection/videoDetection) "
+        "하나만 채워지고, 나머지 두 필드는 null이라 응답 JSON에 키 자체가 안 나온다(2026-09-23 정책) - "
+        "클라이언트는 modality를 보고 어느 필드를 읽을지 판단할 것. errorCode는 완료는 됐지만 일부 판독이 "
+        "정상적으로 비어있을 때만 채워진다(현재 값 NO_FACE_DETECTED) - 목록에는 완료된 기록만 나오므로 "
+        "완전 실패 사유는 여기 오지 않는다."
+    ),
+    status_codes=[
+        "200 OK",
+        "401 Unauthorized",
+        "500 Internal Server Error",
+    ],
+)
+
+# ---- 10. 분석 리포트(통계) 조회 ----
+pdf.endpoint(
+    10, "분석 리포트(통계) 조회", "GET", "/api/v1/analysis/report",
+    "로그인한 회원의 완료된 분석 기록을 집계한 통계를 반환. aiDetectedCount/scamDetectedCount는 점수 "
+    "0.5 이상을 \"탐지됨\"으로 판단한 건수(고정 임계값)",
+    req_params=["없음 (Authorization 헤더로 인증)"],
+    resp_lines=[
+        "{",
+        '  "totalCount": 23,',
+        '  "imageCount": 10,',
+        '  "audioCount": 8,',
+        '  "videoCount": 5,',
+        '  "aiDetectedCount": 3,',
+        '  "scamDetectedCount": 2',
+        "}",
+    ],
+    status_codes=[
+        "200 OK",
+        "401 Unauthorized",
         "500 Internal Server Error",
     ],
 )
