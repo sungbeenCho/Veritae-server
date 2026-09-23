@@ -4,7 +4,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Sort;
 
 import java.util.UUID;
 
@@ -31,7 +30,7 @@ class AnalysisRecordRepositoryTest {
         repository.save(AnalysisRecord.completedSync(otherMemberId, Modality.IMAGE, "{}", 0.3, null));
 
         Page<AnalysisRecord> page = repository.findByMemberIdAndStatusOrderByCreatedAtDesc(
-                memberId, AnalysisJobStatus.COMPLETED, PageRequest.of(0, 10, Sort.by("createdAt").descending()));
+                memberId, AnalysisJobStatus.COMPLETED, PageRequest.of(0, 10));
 
         assertThat(page.getTotalElements()).isEqualTo(2);
         assertThat(page.getContent()).allMatch(r -> r.getMemberId().equals(memberId));

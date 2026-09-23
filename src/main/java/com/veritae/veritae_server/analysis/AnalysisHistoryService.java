@@ -7,8 +7,8 @@ import com.veritae.veritae_server.domain.analysisrecord.Modality;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.UUID;
 
@@ -23,10 +23,14 @@ public class AnalysisHistoryService {
     private final AnalysisRecordRepository analysisRecordRepository;
 
     public Page<AnalysisRecord> getRecords(UUID memberId, int page, int size) {
+        // 정렬은 리포지토리 메서드 이름(OrderByCreatedAtDesc)에 이미 들어있어 Pageable에 Sort를 또 줄 필요가 없다.
         return analysisRecordRepository.findByMemberIdAndStatusOrderByCreatedAtDesc(
-                memberId, AnalysisJobStatus.COMPLETED, PageRequest.of(page, size, Sort.by("createdAt").descending()));
+                memberId, AnalysisJobStatus.COMPLETED, PageRequest.of(page, size));
     }
 
+    // 6번의 count 쿼리가 서로 다른 트랜잭션에서 실행되면 그 사이에 새 기록이 저장됐을 때
+    // 합계가 모달리티별 합과 어긋날 수 있다 - 하나의 읽기 트랜잭션으로 묶어 일관된 스냅샷에서 센다.
+    @Transactional(readOnly = true)
     public AnalysisReportView getReport(UUID memberId) {
         long total = analysisRecordRepository.countByMemberIdAndStatus(memberId, AnalysisJobStatus.COMPLETED);
         long imageCount = analysisRecordRepository.countByMemberIdAndStatusAndModality(

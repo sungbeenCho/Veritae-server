@@ -94,6 +94,8 @@ public final class AnalysisApiMapper {
                 .fromValue(record.getModality().name());
         var summary = new com.veritae.veritae_server.openapi.model.AnalysisRecordSummary(
                 record.getId(), modality, record.getCreatedAt().atOffset(ZoneOffset.UTC));
+        // 판독 필드가 비어있는 이유(예: NO_FACE_DETECTED)를 클라이언트가 알 수 있게 그대로 내려준다.
+        summary.errorCode(record.getErrorCode());
 
         switch (record.getModality()) {
             case IMAGE -> {

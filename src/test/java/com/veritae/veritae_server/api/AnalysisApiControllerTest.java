@@ -51,6 +51,9 @@ class AnalysisApiControllerTest {
     @MockitoBean
     private com.veritae.veritae_server.security.AuthenticatedMemberResolver authenticatedMemberResolver;
 
+    @MockitoBean
+    private com.veritae.veritae_server.analysis.AnalysisHistoryService analysisHistoryService;
+
     // JwtAuthenticationFilter 는 @Component(Filter) 라 @WebMvcTest 슬라이스에도 자동 등록되므로,
     // 그 의존성인 JwtTokenProvider 를 만족시켜야 컨텍스트가 뜬다.
     @MockitoBean
@@ -239,9 +242,6 @@ class AnalysisApiControllerTest {
         mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/v1/analysis/jobs/" + jobId))
                 .andExpect(status().isUnauthorized());
     }
-
-    @MockitoBean
-    private com.veritae.veritae_server.analysis.AnalysisHistoryService analysisHistoryService;
 
     @Test
     @WithMockUser
