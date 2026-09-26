@@ -1,6 +1,7 @@
 package com.veritae.veritae_server.detection.antideepfake;
 
 import com.veritae.veritae_server.detection.AudioAnalysisResult;
+import com.veritae.veritae_server.detection.AudioTooLongException;
 import com.veritae.veritae_server.detection.DetectionServiceException;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
@@ -12,6 +13,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.http.HttpMethod.POST;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
+import static org.springframework.test.web.client.response.MockRestResponseCreators.withBadRequest;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withServerError;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
@@ -107,6 +109,41 @@ class AntiDeepfakeHttpDetectionClientTest {
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
         server.expect(requestTo("http://desktop:8000/process/audio"))
                 .andRespond(withServerError());
+        AntiDeepfakeHttpDetectionClient client = new AntiDeepfakeHttpDetectionClient(builder.build());
+
+        // When / Then
+        assertThatThrownBy(() -> client.detectAudio("fake-bytes".getBytes(), "test.wav", "audio/wav"))
+                .isInstanceOf(DetectionServiceException.class);
+    }
+
+    @Test
+    void detectAudio_whenServerRejectsTooLongAudio_shouldThrowAudioTooLongException() {
+        // Given: 탐지 서버는 5분 초과 음성을 모델 실행 전에 400 + detail.code=AUDIO_TOO_LONG 으로 거부한다.
+        RestClient.Builder builder = RestClient.builder().baseUrl("http://desktop:8000");
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        server.expect(requestTo("http://desktop:8000/process/audio"))
+                .andRespond(withBadRequest()
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .body("""
+                              {"detail": {"code": "AUDIO_TOO_LONG", "message": "음성 길이가 5분을 초과합니다."}}
+                              """));
+        AntiDeepfakeHttpDetectionClient client = new AntiDeepfakeHttpDetectionClient(builder.build());
+
+        // When / Then
+        assertThatThrownBy(() -> client.detectAudio("fake-bytes".getBytes(), "test.wav", "audio/wav"))
+                .isInstanceOf(AudioTooLongException.class)
+                .hasMessage("음성 길이가 5분을 초과합니다.");
+    }
+
+    @Test
+    void detectAudio_whenServerReturnsOtherBadRequest_shouldThrowDetectionServiceException() {
+        // Given: AUDIO_TOO_LONG 이 아닌 400(예: 형식 오류 문자열 detail)은 기존처럼 탐지 서버 오류로 본다.
+        RestClient.Builder builder = RestClient.builder().baseUrl("http://desktop:8000");
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        server.expect(requestTo("http://desktop:8000/process/audio"))
+                .andRespond(withBadRequest()
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .body("{\"detail\": \"empty file\"}"));
         AntiDeepfakeHttpDetectionClient client = new AntiDeepfakeHttpDetectionClient(builder.build());
 
         // When / Then

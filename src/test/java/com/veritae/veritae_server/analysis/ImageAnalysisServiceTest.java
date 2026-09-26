@@ -23,11 +23,15 @@ class ImageAnalysisServiceTest {
     @Mock
     private com.veritae.veritae_server.domain.analysisrecord.AnalysisRecordRepository analysisRecordRepository;
 
+    private com.veritae.veritae_server.media.InMemoryMediaStorage mediaStorage;
+
     private ImageAnalysisService imageAnalysisService;
 
     @org.junit.jupiter.api.BeforeEach
     void setUp() {
-        imageAnalysisService = new ImageAnalysisService(detectionClient, analysisRecordRepository);
+        mediaStorage = new com.veritae.veritae_server.media.InMemoryMediaStorage();
+        imageAnalysisService = new ImageAnalysisService(detectionClient,
+                new AnalysisMediaService(mediaStorage, analysisRecordRepository));
     }
 
     @Test
@@ -37,7 +41,7 @@ class ImageAnalysisServiceTest {
         var expected = new ImageAnalysisResult(new ImageDetectionResult("spai", 0.87, null), null);
         when(detectionClient.detectImage(file.getBytes(), "test.jpg", "image/jpeg")).thenReturn(expected);
 
-        ImageAnalysisResult result = imageAnalysisService.analyzeImage(file, memberId);
+        ImageAnalysisResult result = imageAnalysisService.analyzeImage(file, memberId).result();
 
         assertThat(result.aiDetection().model()).isEqualTo("spai");
         assertThat(result.aiDetection().score()).isEqualTo(0.87);
@@ -80,5 +84,55 @@ class ImageAnalysisServiceTest {
         assertThat(captor.getValue().getMemberId()).isEqualTo(memberId);
         assertThat(captor.getValue().getModality()).isEqualTo(com.veritae.veritae_server.domain.analysisrecord.Modality.IMAGE);
         assertThat(captor.getValue().getAiScore()).isEqualTo(0.87);
+    }
+
+    @Test
+    void analyzeImage_withValidJpeg_shouldReturnIdOfSavedRecord() throws Exception {
+        var file = new MockMultipartFile("file", "test.jpg", "image/jpeg", "fake-bytes".getBytes());
+        var memberId = java.util.UUID.randomUUID();
+        when(detectionClient.detectImage(file.getBytes(), "test.jpg", "image/jpeg"))
+                .thenReturn(new ImageAnalysisResult(new ImageDetectionResult("spai", 0.87, null), null));
+
+        var outcome = imageAnalysisService.analyzeImage(file, memberId);
+
+        var captor = org.mockito.ArgumentCaptor.forClass(
+                com.veritae.veritae_server.domain.analysisrecord.AnalysisRecord.class);
+        org.mockito.Mockito.verify(analysisRecordRepository).save(captor.capture());
+        assertThat(outcome.recordId()).isEqualTo(captor.getValue().getId());
+    }
+
+    @Test
+    void analyzeImage_withValidJpeg_shouldStoreOriginalAndAttachItToRecord() throws Exception {
+        var file = new MockMultipartFile("file", "test.jpg", "image/jpeg", "fake-bytes".getBytes());
+        var memberId = java.util.UUID.randomUUID();
+        when(detectionClient.detectImage(file.getBytes(), "test.jpg", "image/jpeg"))
+                .thenReturn(new ImageAnalysisResult(new ImageDetectionResult("spai", 0.87, null), null));
+
+        imageAnalysisService.analyzeImage(file, memberId);
+
+        var captor = org.mockito.ArgumentCaptor.forClass(
+                com.veritae.veritae_server.domain.analysisrecord.AnalysisRecord.class);
+        org.mockito.Mockito.verify(analysisRecordRepository).save(captor.capture());
+        String mediaKey = captor.getValue().getMediaKey();
+        assertThat(mediaKey).isEqualTo("media/" + memberId + "/" + captor.getValue().getId());
+        assertThat(mediaStorage.objects().get(mediaKey)).isEqualTo("fake-bytes".getBytes());
+        org.mockito.Mockito.verify(analysisRecordRepository)
+                .findByMemberIdAndMediaKeyIsNotNullOrderByCreatedAtDesc(memberId);
+    }
+
+    @Test
+    void analyzeImage_whenMediaStorageDisabled_shouldStillSaveRecordWithoutMedia() throws Exception {
+        mediaStorage.disable();
+        var file = new MockMultipartFile("file", "test.jpg", "image/jpeg", "fake-bytes".getBytes());
+        var memberId = java.util.UUID.randomUUID();
+        when(detectionClient.detectImage(file.getBytes(), "test.jpg", "image/jpeg"))
+                .thenReturn(new ImageAnalysisResult(new ImageDetectionResult("spai", 0.87, null), null));
+
+        imageAnalysisService.analyzeImage(file, memberId);
+
+        var captor = org.mockito.ArgumentCaptor.forClass(
+                com.veritae.veritae_server.domain.analysisrecord.AnalysisRecord.class);
+        org.mockito.Mockito.verify(analysisRecordRepository).save(captor.capture());
+        assertThat(captor.getValue().getMediaKey()).isNull();
     }
 }

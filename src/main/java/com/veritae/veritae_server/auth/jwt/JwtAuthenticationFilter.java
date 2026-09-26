@@ -1,5 +1,6 @@
 package com.veritae.veritae_server.auth.jwt;
 
+import com.veritae.veritae_server.domain.member.MemberRepository;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -29,6 +30,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private static final String BEARER_PREFIX = "Bearer ";
 
     private final JwtTokenProvider jwtTokenProvider;
+    private final MemberRepository memberRepository;
 
     @Override
     protected void doFilterInternal(
@@ -40,11 +42,15 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         if (authHeader != null && authHeader.startsWith(BEARER_PREFIX)) {
             String token = authHeader.substring(BEARER_PREFIX.length());
-            jwtTokenProvider.parseAndValidateAccessToken(token).ifPresent(memberId -> {
-                var authentication = new UsernamePasswordAuthenticationToken(memberId, null, List.of());
-                authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-                SecurityContextHolder.getContext().setAuthentication(authentication);
-            });
+            jwtTokenProvider.parseAndValidateAccessToken(token)
+                    // 탈퇴한 회원의 토큰도 만료 전까지는 서명상 유효하다 - 회원이 없으면 인증하지 않아
+                    // 401 로 막는다(탈퇴한 회원 이름으로 분석 기록이 새로 쌓이지 않게).
+                    .filter(memberRepository::existsById)
+                    .ifPresent(memberId -> {
+                        var authentication = new UsernamePasswordAuthenticationToken(memberId, null, List.of());
+                        authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+                        SecurityContextHolder.getContext().setAuthentication(authentication);
+                    });
         }
 
         filterChain.doFilter(request, response);

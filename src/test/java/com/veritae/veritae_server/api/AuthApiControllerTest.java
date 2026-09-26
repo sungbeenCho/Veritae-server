@@ -44,6 +44,10 @@ class AuthApiControllerTest {
     @MockitoBean
     private JwtTokenProvider jwtTokenProvider;
 
+    // JwtAuthenticationFilter 가 토큰의 회원이 아직 존재하는지(탈퇴 여부) 확인하는 데 쓴다.
+    @MockitoBean
+    private com.veritae.veritae_server.domain.member.MemberRepository memberRepository;
+
     @Test
     void signup_withValidRequest_shouldReturn201WithMemberResponse() throws Exception {
         Member member = Member.register("user@veritae.app", "encoded-hash", "진실이");

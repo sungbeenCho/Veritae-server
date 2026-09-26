@@ -83,4 +83,29 @@ class AnalysisRecordTest {
         assertThat(record.getErrorCode()).isEqualTo("ANALYSIS_FAILED");
         assertThat(record.getErrorMessage()).isEqualTo("탐지 서버 호출 실패");
     }
+
+    @Test
+    void createdAt_shouldBeTruncatedToMicrosecondsToMatchDatabasePrecision() {
+        AnalysisRecord record = AnalysisRecord.submit(UUID.randomUUID());
+
+        assertThat(record.getCreatedAt().getNano() % 1_000).isZero();
+    }
+
+    @Test
+    void newRecord_shouldHaveNoMedia() {
+        AnalysisRecord record = AnalysisRecord.completedSync(UUID.randomUUID(), Modality.IMAGE, "{}", 0.1, null);
+
+        assertThat(record.getMediaKey()).isNull();
+        assertThat(record.hasMedia()).isFalse();
+    }
+
+    @Test
+    void attachMedia_shouldRecordStorageKey() {
+        AnalysisRecord record = AnalysisRecord.completedSync(UUID.randomUUID(), Modality.IMAGE, "{}", 0.1, null);
+
+        record.attachMedia("media/member/record");
+
+        assertThat(record.getMediaKey()).isEqualTo("media/member/record");
+        assertThat(record.hasMedia()).isTrue();
+    }
 }

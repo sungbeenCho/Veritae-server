@@ -1,6 +1,8 @@
 package com.veritae.veritae_server.api;
 
 import com.veritae.veritae_server.analysis.AnalysisHistoryService;
+import com.veritae.veritae_server.analysis.AnalysisJobView;
+import com.veritae.veritae_server.analysis.AnalysisOutcome;
 import com.veritae.veritae_server.detection.AudioAnalysisResult;
 import com.veritae.veritae_server.detection.AudioDetectionResult;
 import com.veritae.veritae_server.detection.Evidence;
@@ -96,6 +98,63 @@ class AnalysisApiMapperTest {
         var response = AnalysisApiMapper.toRecordListResponse(List.of(record));
 
         assertThat(response.getContent()).hasSize(1);
+    }
+
+    @Test
+    void toResponse_shouldIncludeRecordIdAsId() {
+        UUID recordId = UUID.randomUUID();
+        var result = new ImageAnalysisResult(new ImageDetectionResult("spai", 0.1, null), null);
+
+        var response = AnalysisApiMapper.toResponse(new AnalysisOutcome<>(recordId, result));
+
+        assertThat(response.getId()).isEqualTo(recordId);
+        assertThat(response.getAiDetection().getModel()).isEqualTo("spai");
+    }
+
+    @Test
+    void toAudioResponse_shouldIncludeRecordIdAsId() {
+        UUID recordId = UUID.randomUUID();
+        var result = new AudioAnalysisResult(new AudioDetectionResult("antideepfake", 0.2, List.of()), null);
+
+        var response = AnalysisApiMapper.toAudioResponse(new AnalysisOutcome<>(recordId, result));
+
+        assertThat(response.getId()).isEqualTo(recordId);
+        assertThat(response.getAiDetection().getModel()).isEqualTo("antideepfake");
+    }
+
+    @Test
+    void toRecordSummary_withPartialErrorVideoRecord_shouldIncludeErrorMessage() throws Exception {
+        var objectMapper = new com.fasterxml.jackson.databind.ObjectMapper();
+        var record = AnalysisRecord.submit(UUID.randomUUID());
+        record.markCompletedWithPartialError(
+                objectMapper.writeValueAsString(new VideoAnalysisResult(null, null, "NO_FACE_DETECTED")), null, null,
+                "NO_FACE_DETECTED", "영상에서 얼굴을 찾을 수 없어 AI판독은 제공되지 않습니다.");
+
+        var summary = AnalysisApiMapper.toRecordSummary(record);
+
+        assertThat(summary.getErrorMessage()).isEqualTo("영상에서 얼굴을 찾을 수 없어 AI판독은 제공되지 않습니다.");
+    }
+
+    @Test
+    void toRecordSummary_shouldReportWhetherOriginalIsAvailable() throws Exception {
+        var objectMapper = new com.fasterxml.jackson.databind.ObjectMapper();
+        var json = objectMapper.writeValueAsString(new ImageAnalysisResult(new ImageDetectionResult("spai", 0.1, null), null));
+        var withMedia = AnalysisRecord.completedSync(UUID.randomUUID(), Modality.IMAGE, json, 0.1, null);
+        withMedia.attachMedia("media/m/r");
+        var withoutMedia = AnalysisRecord.completedSync(UUID.randomUUID(), Modality.IMAGE, json, 0.1, null);
+
+        assertThat(AnalysisApiMapper.toRecordSummary(withMedia).getMediaAvailable()).isTrue();
+        assertThat(AnalysisApiMapper.toRecordSummary(withoutMedia).getMediaAvailable()).isFalse();
+    }
+
+    @Test
+    void toJobResponse_withPendingJob_shouldIncludeJobsAhead() {
+        var view = new AnalysisJobView(UUID.randomUUID(),
+                com.veritae.veritae_server.domain.analysisrecord.AnalysisJobStatus.PENDING, null, null, null, 2);
+
+        var response = AnalysisApiMapper.toJobResponse(view);
+
+        assertThat(response.getJobsAhead()).isEqualTo(2);
     }
 
     @Test

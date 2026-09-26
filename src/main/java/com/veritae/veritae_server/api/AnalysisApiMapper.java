@@ -1,6 +1,7 @@
 package com.veritae.veritae_server.api;
 
 import com.veritae.veritae_server.analysis.AnalysisJobView;
+import com.veritae.veritae_server.analysis.AnalysisOutcome;
 import com.veritae.veritae_server.detection.AudioAnalysisResult;
 import com.veritae.veritae_server.detection.ImageAnalysisResult;
 import com.veritae.veritae_server.detection.ImageDetectionResult;
@@ -25,16 +26,18 @@ public final class AnalysisApiMapper {
     private static final com.fasterxml.jackson.databind.ObjectMapper OBJECT_MAPPER =
             new com.fasterxml.jackson.databind.ObjectMapper();
 
-    public static ImageAnalysisResponse toResponse(ImageAnalysisResult result) {
+    public static ImageAnalysisResponse toResponse(AnalysisOutcome<ImageAnalysisResult> outcome) {
+        ImageAnalysisResult result = outcome.result();
         var openApiResult = toOpenApiImageResult(result.aiDetection());
-        return new ImageAnalysisResponse(openApiResult)
+        return new ImageAnalysisResponse(outcome.recordId(), openApiResult)
                 .scamDetection(toOpenApiScamDetection(result.scamDetection()));
     }
 
-    public static AudioAnalysisResponse toAudioResponse(AudioAnalysisResult result) {
+    public static AudioAnalysisResponse toAudioResponse(AnalysisOutcome<AudioAnalysisResult> outcome) {
+        AudioAnalysisResult result = outcome.result();
         var openApiResult = new com.veritae.veritae_server.openapi.model.AudioDetectionResult(
                 result.aiDetection().model(), result.aiDetection().score(), toOpenApiEvidence(result.aiDetection().evidence()));
-        return new AudioAnalysisResponse(openApiResult)
+        return new AudioAnalysisResponse(outcome.recordId(), openApiResult)
                 .scamDetection(toOpenApiScamDetection(result.scamDetection()));
     }
 
@@ -53,7 +56,8 @@ public final class AnalysisApiMapper {
                 .aiDetection(aiDetection)
                 .scamDetection(scamDetection)
                 .errorCode(view.errorCode())
-                .errorMessage(view.errorMessage());
+                .errorMessage(view.errorMessage())
+                .jobsAhead(view.jobsAhead());
     }
 
     private static com.veritae.veritae_server.openapi.model.VideoDetectionResult toOpenApiResult(VideoDetectionResult result) {
@@ -92,9 +96,11 @@ public final class AnalysisApiMapper {
         var modality = com.veritae.veritae_server.openapi.model.AnalysisRecordSummary.ModalityEnum
                 .fromValue(record.getModality().name());
         var summary = new com.veritae.veritae_server.openapi.model.AnalysisRecordSummary(
-                record.getId(), modality, record.getCreatedAt().atOffset(ZoneOffset.UTC));
+                record.getId(), modality, record.getCreatedAt().atOffset(ZoneOffset.UTC), record.hasMedia());
         // 판독 필드가 비어있는 이유(예: NO_FACE_DETECTED)를 클라이언트가 알 수 있게 그대로 내려준다.
+        // 문구(errorMessage)도 GET /jobs/{id} 와 같은 값을 내려줘 기록 상세가 분석 직후 화면과 같게 한다.
         summary.errorCode(record.getErrorCode());
+        summary.errorMessage(record.getErrorMessage());
 
         switch (record.getModality()) {
             case IMAGE -> {

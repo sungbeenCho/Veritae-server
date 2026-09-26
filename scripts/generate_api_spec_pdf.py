@@ -224,6 +224,11 @@ class Spec(FPDF):
         if resp_note:
             self.note(resp_note)
         if status_codes:
+            # "상태 코드" 라벨과 목록이 쪽 경계에서 갈라지지 않게 둘을 합친 높이로 미리 넘긴다
+            # (2026-09-26) - 섹션이 한 쪽보다 길 때 마지막 항목의 네모 기호만 앞 쪽에 남고
+            # 글자는 다음 쪽으로 넘어가는 문제가 있었음(응답 예시 라벨+코드블록과 같은 원칙).
+            if self.get_y() + LINE_BODY + 2 + self._bullets_height(status_codes) > self.page_break_trigger:
+                self.add_page()
             self.label("상태 코드")
             self.ln(LINE_BODY + 2)
             self.bullets(status_codes)
@@ -331,7 +336,7 @@ class Spec(FPDF):
 
         표 전체가 새 페이지 시작 지점부터도 안 들어갈 만큼 길어지면(행 20개+ 등) 이 방식은
         그래도 넘쳐버리므로, 실제로 표가 그 정도로 길어질 경우엔 행 단위 분할로 바꿔야 한다.
-        지금 11행 규모에서는 문제되지 않는다.
+        지금 17행 규모에서는 문제되지 않는다.
         """
         col_w = [45, 190, self.content_w() - 45 - 190]
         row_h = 20
@@ -473,15 +478,39 @@ pdf.endpoint(
     ],
 )
 
-# ---- 5. 이미지 AI 판독 ----
+# ---- 5. 회원 탈퇴 ----
 pdf.endpoint(
-    5, "이미지 AI 판독", "POST", "/api/v1/analysis/image",
+    5, "회원 탈퇴", "POST", "/api/v1/members/me/withdrawal",
+    "비밀번호를 한 번 더 확인한 뒤 회원을 탈퇴 처리한다. 회원 정보, 모든 분석 기록, 보관 중인 원본 파일이 "
+    "전부 삭제되며 되돌릴 수 없다. 탈퇴 후에는 기존 access/refresh 토큰이 모두 401로 거부된다",
+    req_body=[
+        "{",
+        '  "password": "veritae123"',
+        "}",
+    ],
+    resp_lines=["(응답 바디 없음 - 204 No Content)"],
+    resp_note=(
+        "비밀번호가 틀리면 401이 아니라 400(INVALID_PASSWORD)이다 - 로그인 상태는 유효하고 입력값만 틀린 "
+        "경우라, 토큰 만료(401)와 구분하기 위함이다."
+    ),
+    status_codes=[
+        "204 No Content (탈퇴 완료)",
+        "400 Bad Request (비밀번호 누락 VALIDATION_FAILED / 비밀번호 불일치 INVALID_PASSWORD)",
+        "401 Unauthorized",
+        "500 Internal Server Error",
+    ],
+)
+
+# ---- 6. 이미지 AI 판독 ----
+pdf.endpoint(
+    6, "이미지 AI 판독", "POST", "/api/v1/analysis/image",
     "업로드한 이미지가 AI로 생성되었을 확률과 사기(보이스피싱 등) 위험도를 함께 반환. 탐지 서버 호출이 "
     "끝날 때까지 응답을 기다리는 동기 방식(수 초~수십 초 소요 가능)",
     req_body=["MULTIPART", "file: 분석할 이미지 파일(jpeg/png/webp)"],
     resp_lines=[
         ("AI 생성 이미지로 판별 + 사기 위험 텍스트도 있는 경우", [
             "{",
+            '  "id": "11111111-1111-1111-1111-111111111111",',
             '  "aiDetection": {',
             '    "model": "spai",',
             '    "score": 0.97,',
@@ -501,6 +530,7 @@ pdf.endpoint(
         ]),
         ("실제 사진(AI 아님) + 텍스트가 전혀 없는 경우", [
             "{",
+            '  "id": "11111111-1111-1111-1111-111111111111",',
             '  "aiDetection": {',
             '    "model": "spai",',
             '    "score": 0.000134',
@@ -514,7 +544,7 @@ pdf.endpoint(
         "시각적으로 보여준다(best-effort - 실패하면 필드 자체가 빠짐). scamDetection: 이미지에서 텍스트가 "
         "추출되면 그 내용의 사기 위험도(model/score/evidence)를 채워 반환하고, 텍스트가 전혀 없으면 필드가 "
         "빠진다 - 이 필드가 없으면 항상 '텍스트가 없었다'는 뜻이며, 사기감지 파이프라인 자체가 실패한 경우는 "
-        "조용히 넘어가지 않고 502로 요청 전체가 실패한다(아래 상태 코드의 502 참고, 2026-09-22 정책)."
+        "조용히 넘어가지 않고 502로 요청 전체가 실패한다(2026-09-22 정책)."
     ),
     status_codes=[
         "200 OK",
@@ -525,15 +555,17 @@ pdf.endpoint(
     ],
 )
 
-# ---- 6. 음성 AI 판독 ----
+# ---- 7. 음성 AI 판독 ----
 pdf.endpoint(
-    6, "음성 AI 판독", "POST", "/api/v1/analysis/audio",
+    7, "음성 AI 판독", "POST", "/api/v1/analysis/audio",
     "업로드한 음성이 AI로 생성(합성)되었을 확률/판독 근거(시간 구간)와 사기(보이스피싱 등) 위험도를 "
-    "함께 반환. 동기 방식",
+    "함께 반환. 동기 방식. 재생 길이가 5분을 넘으면 분석하지 않고 400(AUDIO_TOO_LONG)으로 거부한다 - "
+    "앞부분만 잘라서 분석하지 않는다",
     req_body=["MULTIPART", "file: 분석할 음성 파일(wav/mp3/m4a/aac, 최대 5분/25MB)"],
     resp_lines=[
         ("사기 위험 텍스트가 있는 경우", [
             "{",
+            '  "id": "22222222-2222-2222-2222-222222222222",',
             '  "aiDetection": {',
             '    "model": "antideepfake",',
             '    "score": 0.0018,',
@@ -561,6 +593,7 @@ pdf.endpoint(
         ]),
         ("텍스트가 전혀 없는 경우", [
             "{",
+            '  "id": "22222222-2222-2222-2222-222222222222",',
             '  "aiDetection": {',
             '    "model": "antideepfake",',
             '    "score": 0.0018,',
@@ -577,18 +610,18 @@ pdf.endpoint(
     ),
     status_codes=[
         "200 OK",
-        "400 Bad Request (빈 파일/지원하지 않는 형식/25MB 초과)",
+        "400 Bad Request (빈 파일/지원하지 않는 형식/25MB 초과 INVALID_AUDIO_FILE, 5분 초과 AUDIO_TOO_LONG)",
         "401 Unauthorized",
         "502 Bad Gateway (탐지 서버 호출 실패)",
         "500 Internal Server Error",
     ],
 )
 
-# ---- 7. 영상 AI 판독 요청 ----
+# ---- 8. 영상 AI 판독 요청 ----
 pdf.endpoint(
-    7, "영상 AI 판독 요청", "POST", "/api/v1/analysis/video",
+    8, "영상 AI 판독 요청", "POST", "/api/v1/analysis/video",
     "업로드한 영상의 얼굴조작(face-swap) 딥페이크 여부 분석을 비동기 작업으로 접수. 처리에 수십 "
-    "초~수 분 걸릴 수 있어 즉시 202로 jobId를 반환하고, 결과는 8번 API로 폴링해 확인. 완전 생성형"
+    "초~수 분 걸릴 수 있어 즉시 202로 jobId를 반환하고, 결과는 9번 API로 폴링해 확인. 완전 생성형"
     "(Sora류) 영상 탐지는 미지원 - 얼굴조작 딥페이크만 판독",
     req_body=["MULTIPART", "file: 분석할 영상 파일(mp4/mov/avi, 최대 100MB)"],
     resp_lines=[
@@ -604,16 +637,23 @@ pdf.endpoint(
     ],
 )
 
-# ---- 8. 분석 작업 상태/결과 조회 (M4 반영: errorCode 추가) ----
+# ---- 9. 분석 작업 상태/결과 조회 ----
 pdf.endpoint(
-    8, "분석 작업 상태/결과 조회", "GET", "/api/v1/analysis/jobs/{jobId}",
-    "7번 API로 접수한 작업의 현재 상태를 조회한다. status가 FAILED이면 aiDetection/scamDetection "
-    "둘 다 없다. status가 COMPLETED여도 얼굴을 찾지 못한 영상이면 aiDetection은 없을 수 있다 "
-    "(scamDetection은 별개로 채워질 수 있음) - status만으로 각 필드의 존재 여부를 추측하지 말고 "
-    "aiDetection/scamDetection은 항상 각각 null 체크할 것. 본인이 접수한 작업이 아니면 404 반환",
+    9, "분석 작업 상태/결과 조회", "GET", "/api/v1/analysis/jobs/{jobId}",
+    "8번 API로 접수한 작업의 현재 상태를 조회한다. status만으로 각 필드의 존재 여부를 추측하지 말고 "
+    "aiDetection/scamDetection은 항상 각각 null 체크할 것(경우별 응답은 아래 설명 참고). 진행 중"
+    "(PENDING/PROCESSING)이면 Retry-After 헤더(초)가 붙는다 - 다음 조회까지 그만큼 기다리면 된다. "
+    "본인이 접수한 작업이 아니거나 이미지/음성 기록의 id를 넣으면 404 반환",
     req_params=["jobId (path, UUID): 조회할 작업 ID"],
     resp_lines=[
-        ("진행 중", [
+        ("대기 중 - 앞에 2건 대기 (헤더 Retry-After: 5)", [
+            "{",
+            '  "jobId": "11111111-1111-1111-1111-111111111111",',
+            '  "status": "PENDING",',
+            '  "jobsAhead": 2',
+            "}",
+        ]),
+        ("처리 중 (헤더 Retry-After: 5)", [
             "{",
             '  "jobId": "11111111-1111-1111-1111-111111111111",',
             '  "status": "PROCESSING"',
@@ -667,7 +707,26 @@ pdf.endpoint(
             '  "errorMessage": "영상에서 얼굴을 찾을 수 없어 AI판독은 제공되지 않습니다. 얼굴이 잘 보이는 영상이면 판독도 함께 받을 수 있습니다."',
             "}",
         ]),
-        ("완전 실패 (AI판독/사기감지 모두 실패, 또는 처리 자체 오류)", [
+        ("완료 - 얼굴도 없고 텍스트(말소리·화면 글자)도 없음 (판독 결과 둘 다 없음, 오류 아님)", [
+            "{",
+            '  "jobId": "11111111-1111-1111-1111-111111111111",',
+            '  "status": "COMPLETED",',
+            '  "errorCode": "NO_FACE_DETECTED",',
+            '  "errorMessage": "영상에서 얼굴을 찾을 수 없어 AI판독은 제공되지 않습니다. 얼굴이 잘 보이는 영상이면 판독도 함께 받을 수 있습니다."',
+            "}",
+        ]),
+        ("완료 - 얼굴은 있지만 텍스트 없음 (scamDetection만 없음)", [
+            "{",
+            '  "jobId": "11111111-1111-1111-1111-111111111111",',
+            '  "status": "COMPLETED",',
+            '  "aiDetection": {',
+            '    "model": "dfdc",',
+            '    "score": 0.12,',
+            '    "evidence": []',
+            "  }",
+            "}",
+        ]),
+        ("실패 (AI판독·사기감지 중 하나라도 처리 중 오류)", [
             "{",
             '  "jobId": "11111111-1111-1111-1111-111111111111",',
             '  "status": "FAILED",',
@@ -678,28 +737,37 @@ pdf.endpoint(
     ],
     resp_note=(
         "status: PENDING | PROCESSING | COMPLETED | FAILED. null인 필드는 응답 JSON에 키 자체가 나오지 "
-        "않는다(2026-09-23 정책 - 위 '진행 중' 예시처럼 status만 오고 나머지 필드는 다 빠질 수 있음). "
-        "errorCode/errorMessage는 두 경우에 채워진다: (1) status가 FAILED일 때 - 완전 실패 사유. "
-        "(2) status가 COMPLETED인데 얼굴을 찾지 못해 aiDetection만 비어있을 때 - 부분 사유(현재 값 "
-        "NO_FACE_DETECTED). 즉 errorCode가 있다고 해서 무조건 실패가 아니다 - status를 먼저 보고, "
-        "COMPLETED면 aiDetection/scamDetection 각각 존재 여부(필드가 있는지)로 화면을 구성할 것(위 "
-        "COMPLETED 예시 참고). FAILED일 때의 errorCode는 ANALYSIS_FAILED(처리 자체 실패 - 같은 영상으로 "
-        "재시도 가능)이다. errorMessage는 사용자에게 그대로 보여줄 문구로, 표현이 다듬어질 수 있어 분기 "
+        "않는다(2026-09-23 정책 - 위 '처리 중' 예시처럼 status만 오고 나머지 필드는 다 빠질 수 있음). "
+        "경우별 응답: (1) AI 판독과 사기감지 중 하나라도 처리 중 오류가 나면 성공한 쪽 결과도 함께 버리고 "
+        "FAILED + ANALYSIS_FAILED가 된다(결과 필드 둘 다 없음, 같은 영상으로 재시도 가능) - 한쪽 결과만 "
+        "담긴 COMPLETED는 오지 않는다. 사기감지가 실패했는데 결과가 비어 있으면 '사기 아님'으로 오해될 수 "
+        "있어서다. (2) 얼굴을 찾지 못하면 COMPLETED + NO_FACE_DETECTED이고 aiDetection이 없다 - "
+        "scamDetection은 얼굴과 무관하게 있을 수 있다. (3) 얼굴도 텍스트도 없으면 COMPLETED + "
+        "NO_FACE_DETECTED이고 결과 필드가 둘 다 없다 - 오류가 아니라 '판독할 대상이 없었다'는 정상 결과다. "
+        "(4) 얼굴은 있지만 텍스트가 없으면 COMPLETED이고 errorCode 없이 scamDetection만 없다. errorCode 없이 "
+        "결과 필드가 둘 다 없는 COMPLETED는 오지 않는다. "
+        "scamDetection: 영상의 텍스트는 말소리(음성 인식)와 화면 글자(자막 등)를 합친 것이다 - 이 필드가 "
+        "없으면 '말소리도 화면 글자도 없었다'는 뜻이다(말소리만 없고 화면 글자가 있으면 채워진다). "
+        "jobsAhead: status가 PENDING일 때만 오며, 이 작업보다 먼저 접수돼 아직 처리를 시작하지 않은 영상 "
+        "작업 수다('앞에 N건 대기 중' 표시용, 영상은 접수 순서대로 처리됨). 0이어도 PENDING일 수 있다. "
+        "Retry-After: PENDING/PROCESSING일 때만 붙는 응답 헤더(초, 현재 5). "
+        "보관: 완료(COMPLETED/FAILED)된 작업은 삭제하지 않으므로(회원 탈퇴 시 제외) 앱을 나중에 다시 열어도 "
+        "결과를 조회할 수 있다. errorMessage는 사용자에게 그대로 보여줄 문구로, 표현이 다듬어질 수 있어 분기 "
         "판단에는 절대 쓰지 말고 errorCode만 쓸 것."
     ),
     status_codes=[
         "200 OK",
         "401 Unauthorized",
-        "404 Not Found (작업 없음 또는 본인 소유 아님)",
+        "404 Not Found (작업 없음, 본인 소유 아님, 또는 영상이 아닌 기록의 id)",
         "500 Internal Server Error",
     ],
 )
 
-# ---- 9. 분석 기록 목록 조회 ----
+# ---- 10. 분석 기록 목록 조회 ----
 pdf.endpoint(
-    9, "분석 기록 목록 조회", "GET", "/api/v1/analysis/records",
+    10, "분석 기록 목록 조회", "GET", "/api/v1/analysis/records",
     "로그인한 회원이 완료한 분석(이미지/음성/영상) 기록을 최신순으로 최대 10건 반환. 페이지네이션은 "
-    "지원하지 않음 - 처리중/실패한 기록은 포함되지 않으며, 영상 진행 상태 확인은 8번 API를 사용",
+    "지원하지 않음 - 처리중/실패한 기록은 포함되지 않으며, 영상 진행 상태 확인은 9번 API를 사용",
     req_params=["없음 (Authorization 헤더로 인증)"],
     resp_lines=[
         ("이미지 기록 - imageDetection만 채워짐", [
@@ -709,6 +777,7 @@ pdf.endpoint(
             '      "id": "11111111-1111-1111-1111-111111111111",',
             '      "modality": "IMAGE",',
             '      "createdAt": "2026-09-23T09:00:00Z",',
+            '      "mediaAvailable": true,',
             '      "imageDetection": {',
             '        "model": "spai",',
             '        "score": 0.87,',
@@ -725,6 +794,7 @@ pdf.endpoint(
             '      "id": "22222222-2222-2222-2222-222222222222",',
             '      "modality": "AUDIO",',
             '      "createdAt": "2026-09-23T08:30:00Z",',
+            '      "mediaAvailable": true,',
             '      "audioDetection": {',
             '        "model": "antideepfake",',
             '        "score": 0.73,',
@@ -759,6 +829,7 @@ pdf.endpoint(
             '      "id": "33333333-3333-3333-3333-333333333333",',
             '      "modality": "VIDEO",',
             '      "createdAt": "2026-09-23T08:00:00Z",',
+            '      "mediaAvailable": false,',
             '      "scamDetection": {',
             '        "model": "lilju",',
             '        "score": 0.82,',
@@ -769,7 +840,8 @@ pdf.endpoint(
             "          }",
             "        ]",
             "      },",
-            '      "errorCode": "NO_FACE_DETECTED"',
+            '      "errorCode": "NO_FACE_DETECTED",',
+            '      "errorMessage": "영상에서 얼굴을 찾을 수 없어 AI판독은 제공되지 않습니다. 얼굴이 잘 보이는 영상이면 판독도 함께 받을 수 있습니다."',
             "    }",
             "  ]",
             "}",
@@ -780,7 +852,11 @@ pdf.endpoint(
         "하나만 채워지고, 나머지 두 필드는 null이라 응답 JSON에 키 자체가 안 나온다(2026-09-23 정책) - "
         "클라이언트는 modality를 보고 어느 필드를 읽을지 판단할 것. errorCode는 완료는 됐지만 일부 판독이 "
         "정상적으로 비어있을 때만 채워진다(현재 값 NO_FACE_DETECTED) - 목록에는 완료된 기록만 나오므로 "
-        "완전 실패 사유는 여기 오지 않는다."
+        "완전 실패 사유는 여기 오지 않는다. errorMessage: errorCode와 같은 경우에 채워지는, 사용자에게 그대로 "
+        "보여줄 문구로 9번 API의 errorMessage와 같은 값이다(분기 판단에는 errorCode를 쓸 것). "
+        "mediaAvailable: 원본 파일을 11번 API로 받을 수 있는지(항상 옴). false면 원본이 없으므로(보관 기간 "
+        "지남, 원본 보관 기능 이전 기록 등) 요청하지 않아도 된다. scamDetection: 영상은 말소리와 화면 글자가 "
+        "둘 다 없을 때 빠진다."
     ),
     status_codes=[
         "200 OK",
@@ -789,9 +865,54 @@ pdf.endpoint(
     ],
 )
 
-# ---- 10. 분석 리포트(통계) 조회 ----
+# ---- 11. 분석 원본 파일 다운로드 ----
 pdf.endpoint(
-    10, "분석 리포트(통계) 조회", "GET", "/api/v1/analysis/report",
+    11, "분석 원본 파일 다운로드", "GET", "/api/v1/analysis/records/{id}/media",
+    "분석 기록의 원본 파일(업로드한 이미지/음성/영상)을 업로드 때의 형식 그대로 내려준다. Range 요청을 "
+    "지원한다 - 영상을 끝까지 받기 전에 재생·탐색할 수 있다",
+    req_params=[
+        "id (path, UUID): 분석 기록 id - 10번 API 목록의 id, 6·7번 응답의 id, 8번의 jobId와 같은 값",
+        "Range (header, 선택): 일부만 받을 때. 예) bytes=0-1048575",
+    ],
+    resp_lines=[
+        ("전체 (Range 없음)", [
+            "HTTP/1.1 200 OK",
+            "Content-Type: video/mp4",
+            "Content-Length: 52428800",
+            "Accept-Ranges: bytes",
+            "",
+            "(원본 파일 바이트)",
+        ]),
+        ("일부 (Range: bytes=0-1048575)", [
+            "HTTP/1.1 206 Partial Content",
+            "Content-Type: video/mp4",
+            "Content-Length: 1048576",
+            "Content-Range: bytes 0-1048575/52428800",
+            "Accept-Ranges: bytes",
+            "",
+            "(요청한 범위의 바이트)",
+        ]),
+    ],
+    resp_note=(
+        "보관 정책: 회원당 최신 10건의 원본만 보관한다(10번 목록과 같은 기준). 11번째부터는 원본만 삭제되고 "
+        "분석 결과는 남는다. 분석이 완료된 기록만 원본을 보관한다(처리 중/실패한 영상은 원본 없음). 이 기능이 "
+        "생기기 전의 기록도 원본이 없다. 원본은 저장소에서 암호화된 상태로 보관되며, 회원 탈퇴 시 전부 "
+        "삭제된다. 원본이 없으면 404 MEDIA_NOT_AVAILABLE이 오며, 10번 목록의 mediaAvailable이 false인 기록은 "
+        "요청하지 않아도 된다. 기록이 없거나 본인 것이 아니면 404 ANALYSIS_RECORD_NOT_FOUND."
+    ),
+    status_codes=[
+        "200 OK (파일 전체)",
+        "206 Partial Content (Range 요청)",
+        "401 Unauthorized",
+        "404 Not Found (ANALYSIS_RECORD_NOT_FOUND 기록 없음/본인 소유 아님, MEDIA_NOT_AVAILABLE 원본 없음)",
+        "416 Range Not Satisfiable (Range가 파일 크기를 벗어남)",
+        "500 Internal Server Error",
+    ],
+)
+
+# ---- 12. 분석 리포트(통계) 조회 ----
+pdf.endpoint(
+    12, "분석 리포트(통계) 조회", "GET", "/api/v1/analysis/report",
     "로그인한 회원의 완료된 분석 기록을 집계한 통계를 반환. aiDetectedCount/scamDetectedCount는 점수 "
     "0.5 이상을 \"탐지됨\"으로 판단한 건수(고정 임계값)",
     req_params=["없음 (Authorization 헤더로 인증)"],
@@ -839,12 +960,17 @@ pdf.error_table(
         ("400", "VALIDATION_FAILED", "입력값 검증 실패"),
         ("400", "INVALID_IMAGE_FILE", "이미지 파일이 비어있거나 지원하지 않는 형식"),
         ("400", "INVALID_AUDIO_FILE", "음성 파일이 비어있거나 지원하지 않는 형식/25MB 초과"),
+        ("400", "AUDIO_TOO_LONG", "음성 재생 길이 5분 초과"),
         ("400", "INVALID_VIDEO_FILE", "영상 파일이 비어있거나 지원하지 않는 형식/100MB 초과"),
+        ("400", "INVALID_PASSWORD", "회원 탈퇴 시 비밀번호 불일치"),
         ("401", "INVALID_CREDENTIALS", "이메일 또는 비밀번호 불일치"),
         ("401", "INVALID_REFRESH_TOKEN", "refreshToken 무효/만료"),
         ("401", "UNAUTHORIZED", "액세스 토큰 누락/무효/만료"),
         ("404", "ANALYSIS_JOB_NOT_FOUND", "분석 작업을 찾을 수 없거나 본인 소유가 아님"),
+        ("404", "ANALYSIS_RECORD_NOT_FOUND", "분석 기록을 찾을 수 없거나 본인 소유가 아님"),
+        ("404", "MEDIA_NOT_AVAILABLE", "기록은 있지만 원본 파일이 없음"),
         ("409", "EMAIL_ALREADY_EXISTS", "이미 가입된 이메일"),
+        ("416", "RANGE_NOT_SATISFIABLE", "원본 다운로드의 Range가 파일 크기를 벗어남"),
         ("502", "DETECTION_SERVICE_UNAVAILABLE", "탐지 서버(3060Ti 데스크탑) 호출 실패"),
         ("500", "INTERNAL_SERVER_ERROR", "예기치 못한 서버 오류"),
     ],
