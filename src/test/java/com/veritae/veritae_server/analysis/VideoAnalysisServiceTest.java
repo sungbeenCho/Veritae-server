@@ -136,6 +136,53 @@ class VideoAnalysisServiceTest {
     }
 
     @Test
+    void getJob_withPendingJob_shouldReportHowManyEarlierJobsAreStillWaiting() {
+        // Given
+        UUID memberId = UUID.randomUUID();
+        AnalysisRecord job = AnalysisRecord.submit(memberId);
+        when(analysisRecordRepository.findById(job.getId())).thenReturn(Optional.of(job));
+        when(analysisRecordRepository.countByModalityAndStatusAndCreatedAtBefore(
+                com.veritae.veritae_server.domain.analysisrecord.Modality.VIDEO, AnalysisJobStatus.PENDING, job.getCreatedAt()))
+                .thenReturn(3L);
+
+        // When
+        AnalysisJobView view = videoAnalysisService.getJob(job.getId(), memberId);
+
+        // Then
+        assertThat(view.jobsAhead()).isEqualTo(3);
+    }
+
+    @Test
+    void getJob_withProcessingJob_shouldNotReportJobsAhead() {
+        // Given
+        UUID memberId = UUID.randomUUID();
+        AnalysisRecord job = AnalysisRecord.submit(memberId);
+        job.markProcessing();
+        when(analysisRecordRepository.findById(job.getId())).thenReturn(Optional.of(job));
+
+        // When
+        AnalysisJobView view = videoAnalysisService.getJob(job.getId(), memberId);
+
+        // Then
+        assertThat(view.jobsAhead()).isNull();
+    }
+
+    @Test
+    void getJob_withImageRecordId_shouldThrowAnalysisJobNotFoundException() {
+        // Given: 이미지/음성 응답에도 기록 id가 나가므로, 그 id로 영상 폴링을 호출하는 경우 -
+        // 영상 결과 형식으로 읽으려다 500이 나면 안 되고 404여야 한다.
+        UUID memberId = UUID.randomUUID();
+        AnalysisRecord imageRecord = AnalysisRecord.completedSync(
+                memberId, com.veritae.veritae_server.domain.analysisrecord.Modality.IMAGE,
+                "{\"aiDetection\":{\"model\":\"spai\",\"score\":0.1}}", 0.1, null);
+        when(analysisRecordRepository.findById(imageRecord.getId())).thenReturn(Optional.of(imageRecord));
+
+        // When / Then
+        assertThatThrownBy(() -> videoAnalysisService.getJob(imageRecord.getId(), memberId))
+                .isInstanceOf(AnalysisJobNotFoundException.class);
+    }
+
+    @Test
     void getJob_withNonExistentJob_shouldThrowAnalysisJobNotFoundException() {
         // Given
         UUID jobId = UUID.randomUUID();

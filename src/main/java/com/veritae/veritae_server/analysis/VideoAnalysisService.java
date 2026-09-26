@@ -5,6 +5,7 @@ import com.veritae.veritae_server.detection.VideoAnalysisResult;
 import com.veritae.veritae_server.domain.analysisrecord.AnalysisRecord;
 import com.veritae.veritae_server.domain.analysisrecord.AnalysisRecordRepository;
 import com.veritae.veritae_server.domain.analysisrecord.AnalysisJobStatus;
+import com.veritae.veritae_server.domain.analysisrecord.Modality;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
@@ -52,16 +53,24 @@ public class VideoAnalysisService {
     }
 
     public AnalysisJobView getJob(UUID jobId, UUID requesterId) {
+        // 이미지/음성 기록 id도 응답으로 나가므로 그 id가 들어올 수 있다 - 영상 작업이 아니면 없는
+        // 작업으로 본다(영상 결과 형식으로 읽으려다 500이 나지 않게).
         AnalysisRecord record = analysisRecordRepository.findById(jobId)
+                .filter(r -> r.getMemberId().equals(requesterId))
+                .filter(r -> r.getModality() == Modality.VIDEO)
                 .orElseThrow(() -> new AnalysisJobNotFoundException(jobId));
-        if (!record.getMemberId().equals(requesterId)) {
-            throw new AnalysisJobNotFoundException(jobId);
-        }
 
         VideoAnalysisResult result = record.getStatus() == AnalysisJobStatus.COMPLETED
                 ? readResultJson(record.getResultJson())
                 : null;
-        return new AnalysisJobView(record.getId(), record.getStatus(), result, record.getErrorCode(), record.getErrorMessage());
+        // 영상은 접수 순서대로 대기열(AsyncConfig, 먼저 들어온 순서로 꺼냄)에 들어가 2건씩 동시에 처리된다.
+        // 나보다 먼저 접수돼 아직 처리를 시작하지 않은(PENDING) 작업 수가 곧 내 앞의 대기 건수다.
+        Integer jobsAhead = record.getStatus() == AnalysisJobStatus.PENDING
+                ? Math.toIntExact(analysisRecordRepository.countByModalityAndStatusAndCreatedAtBefore(
+                        Modality.VIDEO, AnalysisJobStatus.PENDING, record.getCreatedAt()))
+                : null;
+        return new AnalysisJobView(record.getId(), record.getStatus(), result, record.getErrorCode(),
+                record.getErrorMessage(), jobsAhead);
     }
 
     private void validate(MultipartFile file) {

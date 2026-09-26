@@ -1,9 +1,12 @@
 package com.veritae.veritae_server.detection.antideepfake;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.veritae.veritae_server.detection.AudioAnalysisResult;
 import com.veritae.veritae_server.detection.AudioDetectionClient;
 import com.veritae.veritae_server.detection.AudioDetectionResult;
+import com.veritae.veritae_server.detection.AudioTooLongException;
 import com.veritae.veritae_server.detection.DetectionServiceException;
 import com.veritae.veritae_server.detection.Evidence;
 import com.veritae.veritae_server.detection.ScamDetectionJson;
@@ -12,9 +15,11 @@ import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.MultipartBodyBuilder;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 
+import java.io.IOException;
 import java.util.List;
 
 /**
@@ -28,6 +33,11 @@ import java.util.List;
 @Component
 @RequiredArgsConstructor
 public class AntiDeepfakeHttpDetectionClient implements AudioDetectionClient {
+
+    // 탐지 서버가 5분 초과 음성을 모델 실행 전에 거부할 때 400 바디 detail.code 로 주는 값.
+    private static final String AUDIO_TOO_LONG = "AUDIO_TOO_LONG";
+
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
     private final RestClient detectionRestClient;
 
@@ -58,8 +68,26 @@ public class AntiDeepfakeHttpDetectionClient implements AudioDetectionClient {
                     .toList();
             var aiDetection = new AudioDetectionResult(response.aiDetection().model(), response.aiDetection().score(), evidence);
             return new AudioAnalysisResult(aiDetection, ScamDetectionJson.toScamDetection(response.scamDetection()));
+        } catch (HttpClientErrorException.BadRequest e) {
+            if (AUDIO_TOO_LONG.equals(detailCode(e))) {
+                throw new AudioTooLongException("음성 길이가 5분을 초과합니다.");
+            }
+            throw new DetectionServiceException("탐지 서버 호출에 실패했습니다: " + e.getMessage(), e);
         } catch (RestClientException e) {
             throw new DetectionServiceException("탐지 서버 호출에 실패했습니다: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * 탐지 서버의 400 바디 {"detail": {"code": "...", "message": "..."}} 에서 code 를 꺼낸다. detail 이
+     * 문자열인 다른 400(형식 오류 등)이거나 바디를 읽을 수 없으면 null.
+     */
+    private static String detailCode(HttpClientErrorException e) {
+        try {
+            JsonNode code = OBJECT_MAPPER.readTree(e.getResponseBodyAsByteArray()).path("detail").path("code");
+            return code.isTextual() ? code.asText() : null;
+        } catch (IOException ignored) {
+            return null;
         }
     }
 

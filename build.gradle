@@ -44,6 +44,12 @@ dependencies {
 	// NoClassDefFoundError 로 확인. 리액티브 스택 전체 대신 이 인터페이스 전용 초경량 jar만 추가.
 	runtimeOnly 'org.reactivestreams:reactive-streams'
 
+	// 분석 원본 파일 보관(Cloudflare R2). R2는 S3 호환 API라 AWS SDK의 S3 클라이언트를 그대로 쓴다
+	// (Cloudflare 공식 문서의 Java 연동 방식). 요청마다 HTTP 연결을 새로 맺지 않도록 기본 HTTP 구현
+	// (apache-client)을 함께 쓴다 - s3 모듈이 런타임 의존성으로 끌고 온다.
+	implementation platform('software.amazon.awssdk:bom:2.55.6')
+	implementation 'software.amazon.awssdk:s3'
+
 	compileOnly 'org.projectlombok:lombok'
 	runtimeOnly 'com.mysql:mysql-connector-j'
 	annotationProcessor 'org.projectlombok:lombok'

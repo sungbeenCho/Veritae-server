@@ -3,7 +3,6 @@ package com.veritae.veritae_server.analysis;
 import com.veritae.veritae_server.detection.DetectionClient;
 import com.veritae.veritae_server.detection.ImageAnalysisResult;
 import com.veritae.veritae_server.domain.analysisrecord.AnalysisRecord;
-import com.veritae.veritae_server.domain.analysisrecord.AnalysisRecordRepository;
 import com.veritae.veritae_server.domain.analysisrecord.Modality;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -26,23 +25,25 @@ public class ImageAnalysisService {
             new com.fasterxml.jackson.databind.ObjectMapper();
 
     private final DetectionClient detectionClient;
-    private final AnalysisRecordRepository analysisRecordRepository;
+    private final AnalysisMediaService analysisMediaService;
 
-    public ImageAnalysisResult analyzeImage(MultipartFile file, UUID memberId) {
+    public AnalysisOutcome<ImageAnalysisResult> analyzeImage(MultipartFile file, UUID memberId) {
         validate(file);
-        ImageAnalysisResult result;
+        byte[] bytes;
         try {
-            result = detectionClient.detectImage(file.getBytes(), file.getOriginalFilename(), file.getContentType());
+            bytes = file.getBytes();
         } catch (IOException e) {
             throw new UncheckedIOException("업로드된 파일을 읽을 수 없습니다.", e);
         }
+        ImageAnalysisResult result = detectionClient.detectImage(bytes, file.getOriginalFilename(), file.getContentType());
 
         Double aiScore = result.aiDetection() != null ? result.aiDetection().score() : null;
         Double scamScore = result.scamDetection() != null ? result.scamDetection().score() : null;
-        analysisRecordRepository.save(AnalysisRecord.completedSync(
-                memberId, Modality.IMAGE, writeResultJson(result), aiScore, scamScore));
+        AnalysisRecord record = AnalysisRecord.completedSync(
+                memberId, Modality.IMAGE, writeResultJson(result), aiScore, scamScore);
+        analysisMediaService.saveRecordWithOriginal(record, bytes, file.getContentType());
 
-        return result;
+        return new AnalysisOutcome<>(record.getId(), result);
     }
 
     private void validate(MultipartFile file) {
