@@ -501,9 +501,9 @@ pdf.endpoint(
     ],
 )
 
-# ---- 6. 이미지 AI 판독 ----
+# ---- 6. 이미지 분석 (AI 생성 여부 + 사기 위험도) ----
 pdf.endpoint(
-    6, "이미지 AI 판독", "POST", "/api/v1/analysis/image",
+    6, "이미지 분석 (AI 생성 여부 + 사기 위험도)", "POST", "/api/v1/analysis/image",
     "업로드한 이미지가 AI로 생성되었을 확률과 사기(보이스피싱 등) 위험도를 함께 반환. 탐지 서버 호출이 "
     "끝날 때까지 응답을 기다리는 동기 방식(수 초~수십 초 소요 가능)",
     req_body=["MULTIPART", "file: 분석할 이미지 파일(jpeg/png/webp)"],
@@ -555,20 +555,20 @@ pdf.endpoint(
     ],
 )
 
-# ---- 7. 음성 AI 판독 ----
+# ---- 7. 음성 분석 (AI 합성 여부 + 사기 위험도) ----
 pdf.endpoint(
-    7, "음성 AI 판독", "POST", "/api/v1/analysis/audio",
+    7, "음성 분석 (AI 합성 여부 + 사기 위험도)", "POST", "/api/v1/analysis/audio",
     "업로드한 음성이 AI로 생성(합성)되었을 확률/판독 근거(시간 구간)와 사기(보이스피싱 등) 위험도를 "
     "함께 반환. 동기 방식. 재생 길이가 5분을 넘으면 분석하지 않고 400(AUDIO_TOO_LONG)으로 거부한다 - "
     "앞부분만 잘라서 분석하지 않는다",
     req_body=["MULTIPART", "file: 분석할 음성 파일(wav/mp3/m4a/aac, 최대 5분/25MB)"],
     resp_lines=[
-        ("사기 위험 텍스트가 있는 경우", [
+        ("합성 음성으로 판별 + 사기 위험 텍스트가 있는 경우", [
             "{",
             '  "id": "22222222-2222-2222-2222-222222222222",',
             '  "aiDetection": {',
             '    "model": "antideepfake",',
-            '    "score": 0.0018,',
+            '    "score": 0.91,',
             '    "evidence": [',
             "      {",
             '        "title": "시간 구간 이상 패턴",',
@@ -591,7 +591,7 @@ pdf.endpoint(
             "  }",
             "}",
         ]),
-        ("텍스트가 전혀 없는 경우", [
+        ("실제 음성(AI 아님) + 텍스트가 전혀 없는 경우", [
             "{",
             '  "id": "22222222-2222-2222-2222-222222222222",',
             '  "aiDetection": {',
@@ -617,10 +617,11 @@ pdf.endpoint(
     ],
 )
 
-# ---- 8. 영상 AI 판독 요청 ----
+# ---- 8. 영상 분석 요청 (얼굴조작 딥페이크 여부 + 사기 위험도) ----
 pdf.endpoint(
-    8, "영상 AI 판독 요청", "POST", "/api/v1/analysis/video",
-    "업로드한 영상의 얼굴조작(face-swap) 딥페이크 여부 분석을 비동기 작업으로 접수. 처리에 수십 "
+    8, "영상 분석 요청 (얼굴조작 딥페이크 여부 + 사기 위험도)", "POST", "/api/v1/analysis/video",
+    "업로드한 영상의 얼굴조작(face-swap) 딥페이크 여부와 말소리·화면 글자의 사기(보이스피싱 등) 위험도 "
+    "분석을 비동기 작업으로 접수. 처리에 수십 "
     "초~수 분 걸릴 수 있어 즉시 202로 jobId를 반환하고, 결과는 9번 API로 폴링해 확인. 완전 생성형"
     "(Sora류) 영상 탐지는 미지원 - 얼굴조작 딥페이크만 판독",
     req_body=["MULTIPART", "file: 분석할 영상 파일(mp4/mov/avi, 최대 100MB)"],
@@ -637,9 +638,9 @@ pdf.endpoint(
     ],
 )
 
-# ---- 9. 분석 작업 상태/결과 조회 ----
+# ---- 9. 영상 분석 상태/결과 조회 ----
 pdf.endpoint(
-    9, "분석 작업 상태/결과 조회", "GET", "/api/v1/analysis/jobs/{jobId}",
+    9, "영상 분석 상태/결과 조회", "GET", "/api/v1/analysis/jobs/{jobId}",
     "8번 API로 접수한 작업의 현재 상태를 조회한다. status만으로 각 필드의 존재 여부를 추측하지 말고 "
     "aiDetection/scamDetection은 항상 각각 null 체크할 것(경우별 응답은 아래 설명 참고). 진행 중"
     "(PENDING/PROCESSING)이면 Retry-After 헤더(초)가 붙는다 - 다음 조회까지 그만큼 기다리면 된다. "
@@ -770,7 +771,7 @@ pdf.endpoint(
     "지원하지 않음 - 처리중/실패한 기록은 포함되지 않으며, 영상 진행 상태 확인은 9번 API를 사용",
     req_params=["없음 (Authorization 헤더로 인증)"],
     resp_lines=[
-        ("이미지 기록 - imageDetection만 채워짐", [
+        ("이미지 기록 - 글자 없는 사진(imageDetection만)", [
             "{",
             '  "content": [',
             "    {",
@@ -787,7 +788,7 @@ pdf.endpoint(
             "  ]",
             "}",
         ]),
-        ("음성 기록 - audioDetection만 채워짐", [
+        ("음성 기록 - audioDetection + 사기감지", [
             "{",
             '  "content": [',
             "    {",
@@ -800,8 +801,8 @@ pdf.endpoint(
             '        "score": 0.73,',
             '        "evidence": [',
             "          {",
-            '            "title": "합성 음성 의심 구간",',
-            '            "description": "1.0초~4.0초 구간에서 부자연스러운 음성 합성 흔적이 감지됨",',
+            '            "title": "시간 구간 이상 패턴",',
+            '            "description": "1.0초~4.0초 구간에서 합성 흔적이 감지됨",',
             '            "tags": ["temporal"],',
             '            "startSec": 1.0,',
             '            "endSec": 4.0',
@@ -822,7 +823,7 @@ pdf.endpoint(
             "  ]",
             "}",
         ]),
-        ("영상 기록 - 얼굴 없음(videoDetection은 없지만 사기감지는 살아있음)", [
+        ("영상 기록 - 얼굴 없음(videoDetection 없음, 사기감지는 있음)", [
             "{",
             '  "content": [',
             "    {",
@@ -880,6 +881,7 @@ pdf.endpoint(
             "Content-Type: video/mp4",
             "Content-Length: 52428800",
             "Accept-Ranges: bytes",
+            'Content-Disposition: attachment; filename="33333333-3333-3333-3333-333333333333.mp4"',
             "",
             "(원본 파일 바이트)",
         ]),
@@ -889,11 +891,14 @@ pdf.endpoint(
             "Content-Length: 1048576",
             "Content-Range: bytes 0-1048575/52428800",
             "Accept-Ranges: bytes",
+            'Content-Disposition: attachment; filename="33333333-3333-3333-3333-333333333333.mp4"',
             "",
             "(요청한 범위의 바이트)",
         ]),
     ],
     resp_note=(
+        "Content-Disposition: 파일로 내려받는 응답임을 알리는 헤더로, 파일 이름은 \"기록id.확장자\"(원본 파일 "
+        "이름은 보관하지 않음). 앱의 다운로드·재생에는 영향이 없다. "
         "보관 정책: 회원당 최신 10건의 원본만 보관한다(10번 목록과 같은 기준). 11번째부터는 원본만 삭제되고 "
         "분석 결과는 남는다. 분석이 완료된 기록만 원본을 보관한다(처리 중/실패한 영상은 원본 없음). 이 기능이 "
         "생기기 전의 기록도 원본이 없다. 원본은 저장소에서 암호화된 상태로 보관되며, 회원 탈퇴 시 전부 "
@@ -936,7 +941,9 @@ pdf.endpoint(
 # ---- 오류 응답 형식 ----
 pdf.error_format_block(
     "오류 응답 형식",
-    "모든 오류는 RFC 9457 형식(application/problem+json)으로 통일됨:",
+    "모든 오류는 RFC 9457 형식(application/problem+json)으로 통일됨. violations의 message는 서버 검증 "
+    "기본 문구라 서버 언어 설정에 따라 달라질 수 있고, 한 필드에 규칙이 여러 개 어긋나면 같은 field가 "
+    "여러 번 온다 - 분기 처리는 errorCode/field로 할 것:",
     [
         "{",
         '  "type": "https://api.veritae.app/errors/validation",',
@@ -947,7 +954,14 @@ pdf.error_format_block(
         '  "errorCode": "VALIDATION_FAILED",',
         '  "timestamp": "2026-07-17T09:00:00Z",',
         '  "violations": [',
-        '    { "field": "password", "message": "8~20자, 영문자와 숫자를 각각 1자 이상 포함해야 합니다." }',
+        '    {',
+        '      "field": "password",',
+        r'      "message": "\"^(?=.*[A-Za-z])(?=.*\d).{8,20}$\"와 일치해야 합니다"',
+        '    },',
+        '    {',
+        '      "field": "password",',
+        '      "message": "크기가 8에서 20 사이여야 합니다"',
+        '    }',
         "  ]",
         "}",
     ],

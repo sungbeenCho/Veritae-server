@@ -17,6 +17,7 @@ import com.veritae.veritae_server.security.AuthenticatedMemberResolver;
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.io.InputStreamResource;
 import org.springframework.core.io.Resource;
+import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -83,6 +84,12 @@ public class AnalysisApiDelegateImpl implements AnalysisApiDelegate {
                 : MediaType.APPLICATION_OCTET_STREAM);
         headers.setContentLength(media.contentLength());
         headers.set(HttpHeaders.ACCEPT_RANGES, "bytes");
+        // 파일로 내려받는 응답임을 알린다 - Swagger UI 가 영상 바이트를 글자로 찍지 않고 다운로드 링크를
+        // 보여준다. 앱(URLSession/AVPlayer)은 이 헤더를 쓰지 않아 동작이 바뀌지 않는다. 원본 파일 이름은
+        // 보관하지 않으므로 "기록id.확장자"로 이름을 붙인다.
+        headers.setContentDisposition(ContentDisposition.attachment()
+                .filename(id + "." + mediaFileExtension(media.contentType()))
+                .build());
         if (media.partial()) {
             headers.set(HttpHeaders.CONTENT_RANGE, media.contentRange());
         }
@@ -91,6 +98,26 @@ public class AnalysisApiDelegateImpl implements AnalysisApiDelegate {
         return ResponseEntity.status(media.partial() ? HttpStatus.PARTIAL_CONTENT : HttpStatus.OK)
                 .headers(headers)
                 .body(new InputStreamResource(media.content()));
+    }
+
+    // 업로드 때 허용하는 형식(이미지/음성/영상 서비스의 ALLOWED_CONTENT_TYPES)별 확장자.
+    static String mediaFileExtension(String contentType) {
+        if (contentType == null) {
+            return "bin";
+        }
+        return switch (contentType) {
+            case "image/jpeg" -> "jpg";
+            case "image/png" -> "png";
+            case "image/webp" -> "webp";
+            case "audio/wav", "audio/x-wav" -> "wav";
+            case "audio/mpeg" -> "mp3";
+            case "audio/mp4" -> "m4a";
+            case "audio/aac" -> "aac";
+            case "video/mp4" -> "mp4";
+            case "video/quicktime" -> "mov";
+            case "video/x-msvideo" -> "avi";
+            default -> "bin";
+        };
     }
 
     @Override

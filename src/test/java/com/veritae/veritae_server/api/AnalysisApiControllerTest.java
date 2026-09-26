@@ -423,6 +423,34 @@ class AnalysisApiControllerTest {
 
     @Test
     @WithMockUser
+    void getAnalysisRecordMedia_shouldSendAttachmentFilenameWithIdAndExtension() throws Exception {
+        java.util.UUID recordId = java.util.UUID.randomUUID();
+        java.util.UUID memberId = java.util.UUID.randomUUID();
+        when(authenticatedMemberResolver.currentMemberId()).thenReturn(memberId);
+        when(analysisMediaService.openOriginal(recordId, memberId, null)).thenReturn(new MediaObject(
+                new java.io.ByteArrayInputStream("orig".getBytes()), "video/mp4", 4, null));
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                        .get("/api/v1/analysis/records/" + recordId + "/media"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Content-Disposition",
+                        "attachment; filename=\"" + recordId + ".mp4\""));
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.CsvSource({
+            "image/jpeg, jpg", "image/png, png", "image/webp, webp",
+            "audio/wav, wav", "audio/x-wav, wav", "audio/mpeg, mp3", "audio/mp4, m4a", "audio/aac, aac",
+            "video/mp4, mp4", "video/quicktime, mov", "video/x-msvideo, avi",
+            "application/octet-stream, bin"
+    })
+    void mediaFilenameExtension_shouldFollowContentType(String contentType, String extension) {
+        org.assertj.core.api.Assertions.assertThat(AnalysisApiDelegateImpl.mediaFileExtension(contentType))
+                .isEqualTo(extension);
+    }
+
+    @Test
+    @WithMockUser
     void getAnalysisRecordMedia_whenOriginalMissing_shouldReturn404MediaNotAvailable() throws Exception {
         java.util.UUID recordId = java.util.UUID.randomUUID();
         java.util.UUID memberId = java.util.UUID.randomUUID();
