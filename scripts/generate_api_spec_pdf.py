@@ -544,7 +544,9 @@ pdf.endpoint(
         "시각적으로 보여준다(best-effort - 실패하면 필드 자체가 빠짐). scamDetection: 이미지에서 텍스트가 "
         "추출되면 그 내용의 사기 위험도(model/score/evidence)를 채워 반환하고, 텍스트가 전혀 없으면 필드가 "
         "빠진다 - 이 필드가 없으면 항상 '텍스트가 없었다'는 뜻이며, 사기감지 파이프라인 자체가 실패한 경우는 "
-        "조용히 넘어가지 않고 502로 요청 전체가 실패한다(2026-09-22 정책)."
+        "조용히 넘어가지 않고 502로 요청 전체가 실패한다(2026-09-22 정책). misinformationDetection: 텍스트가 "
+        "추출되면 위키백과와 대조해 거짓으로 판정된 문장만 채워 반환하고(claims 빈 배열이면 반박 근거를 못 "
+        "찾았다는 뜻), 텍스트가 전혀 없으면 필드가 빠진다 - scamDetection과 동일한 원칙(파이프라인 실패 시 502)."
     ),
     status_codes=[
         "200 OK",
@@ -606,7 +608,10 @@ pdf.endpoint(
         "null인 필드는 응답 JSON에 키 자체가 나오지 않는다(2026-09-23 정책 - 예: 이 케이스의 scamDetection). "
         "scamDetection: 음성에서 텍스트(발화)가 추출되면 그 내용의 사기 위험도를 채워 반환하고, 발화가 "
         "전혀 없으면 필드가 빠진다 - 이 필드가 없으면 항상 '텍스트가 없었다'는 뜻이며, 사기감지 파이프라인 "
-        "자체가 실패한 경우는 조용히 넘어가지 않고 502로 요청 전체가 실패한다(2026-09-22 정책)."
+        "자체가 실패한 경우는 조용히 넘어가지 않고 502로 요청 전체가 실패한다(2026-09-22 정책). "
+        "misinformationDetection: 발화가 추출되면 위키백과와 대조해 거짓으로 판정된 문장만 채워 반환하고 "
+        "(claims 빈 배열이면 반박 근거를 못 찾았다는 뜻), 발화가 전혀 없으면 필드가 빠진다 - scamDetection과 "
+        "동일한 원칙(파이프라인 실패 시 502)."
     ),
     status_codes=[
         "200 OK",
@@ -919,7 +924,8 @@ pdf.endpoint(
 pdf.endpoint(
     12, "분석 리포트(통계) 조회", "GET", "/api/v1/analysis/report",
     "로그인한 회원의 완료된 분석 기록을 집계한 통계를 반환. aiDetectedCount/scamDetectedCount는 점수 "
-    "0.5 이상을 \"탐지됨\"으로 판단한 건수(고정 임계값)",
+    "0.5 이상을 \"탐지됨\"으로 판단한 건수(고정 임계값). misinformationDetectedCount는 가짜정보(반박된 "
+    "주장)가 하나 이상 발견된 건수",
     req_params=["없음 (Authorization 헤더로 인증)"],
     resp_lines=[
         "{",
@@ -928,7 +934,8 @@ pdf.endpoint(
         '  "audioCount": 8,',
         '  "videoCount": 5,',
         '  "aiDetectedCount": 3,',
-        '  "scamDetectedCount": 2',
+        '  "scamDetectedCount": 2,',
+        '  "misinformationDetectedCount": 1',
         "}",
     ],
     status_codes=[

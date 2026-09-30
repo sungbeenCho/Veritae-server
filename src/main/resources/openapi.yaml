@@ -201,6 +201,23 @@ paths:
                     aiDetection:
                       model: spai
                       score: 0.000134
+                misinformation:
+                  summary: 텍스트에 위키백과와 어긋나는 주장이 있는 경우
+                  value:
+                    id: 11111111-1111-1111-1111-111111111111
+                    aiDetection:
+                      model: spai
+                      score: 0.02
+                    misinformationDetection:
+                      model: qwen3.5:4b
+                      wikiSnapshot: '2026-09-01'
+                      claims:
+                        - sentence: 선풍기를 틀고 자면 사망한다.
+                          reason: 근거 문단은 선풍기 사망설을 과학적 근거가 없는 미신이라고 설명합니다.
+                          evidence:
+                            - title: 선풍기 사망설
+                              text: 선풍기 사망설이란, 밀폐된 방에서 얼굴을 향해 선풍기를 켜놓은 채로 잠을 자면 사망할 수 있다는 미신이다.
+                              url: https://ko.wikipedia.org/wiki/선풍기_사망설
         '400':
           $ref: '#/components/responses/InvalidImageFile'
         '401':
@@ -269,6 +286,24 @@ paths:
                       model: antideepfake
                       score: 0.0018
                       evidence: []
+                misinformation:
+                  summary: 텍스트에 위키백과와 어긋나는 주장이 있는 경우
+                  value:
+                    id: 22222222-2222-2222-2222-222222222222
+                    aiDetection:
+                      model: antideepfake
+                      score: 0.0018
+                      evidence: []
+                    misinformationDetection:
+                      model: qwen3.5:4b
+                      wikiSnapshot: '2026-09-01'
+                      claims:
+                        - sentence: 선풍기를 틀고 자면 사망한다.
+                          reason: 근거 문단은 선풍기 사망설을 과학적 근거가 없는 미신이라고 설명합니다.
+                          evidence:
+                            - title: 선풍기 사망설
+                              text: 선풍기 사망설이란, 밀폐된 방에서 얼굴을 향해 선풍기를 켜놓은 채로 잠을 자면 사망할 수 있다는 미신이다.
+                              url: https://ko.wikipedia.org/wiki/선풍기_사망설
         '400':
           $ref: '#/components/responses/InvalidAudioFile'
         '401':
@@ -804,6 +839,15 @@ components:
             사기(보이스피싱 등) 위험도 판독 결과. 텍스트가 전혀 추출되지 않으면 없음(null) - 이 필드가
             null이면 항상 "분석할 텍스트가 없었다"는 뜻이다. 사기감지 파이프라인 자체가 실패한 경우는
             null로 조용히 넘어가지 않고 502로 요청 전체가 실패한다(2026-09-22).
+        misinformationDetection:
+          allOf:
+            - $ref: '#/components/schemas/MisinformationDetectionResult'
+          nullable: true
+          description: >-
+            가짜정보(허위정보) 판별 결과. 텍스트가 전혀 추출되지 않으면 없음(null). 거짓으로
+            판정된 문장만 담기고, claims가 빈 배열이면 검사는 했지만 반박 근거를 못 찾았다는
+            뜻이다("모두 사실"이 아님). 가짜정보 파이프라인 자체가 실패한 경우는 502로 요청
+            전체가 실패한다(scamDetection과 동일 원칙).
 
     AudioAnalysisResponse:
       type: object
@@ -828,6 +872,15 @@ components:
             사기(보이스피싱 등) 위험도 판독 결과. 텍스트가 전혀 추출되지 않으면 없음(null) - 이 필드가
             null이면 항상 "분석할 텍스트가 없었다"는 뜻이다. 사기감지 파이프라인 자체가 실패한 경우는
             null로 조용히 넘어가지 않고 502로 요청 전체가 실패한다(2026-09-22).
+        misinformationDetection:
+          allOf:
+            - $ref: '#/components/schemas/MisinformationDetectionResult'
+          nullable: true
+          description: >-
+            가짜정보(허위정보) 판별 결과. 텍스트가 전혀 추출되지 않으면 없음(null). 거짓으로
+            판정된 문장만 담기고, claims가 빈 배열이면 검사는 했지만 반박 근거를 못 찾았다는
+            뜻이다("모두 사실"이 아님). 가짜정보 파이프라인 자체가 실패한 경우는 502로 요청
+            전체가 실패한다(scamDetection과 동일 원칙).
 
     AnalysisJobAcceptedResponse:
       type: object
@@ -882,6 +935,15 @@ components:
             인식)와 화면 글자(자막 등)를 합친 것이다 - 이 필드가 없으면 "말소리도 화면 글자도
             없었다"는 뜻이다(말소리만 없고 화면 글자가 있으면 채워진다). 사기감지 처리 자체가 실패한
             경우는 이 필드가 조용히 비지 않고 작업 전체가 FAILED가 된다. aiDetection 유무와는 무관하다.
+        misinformationDetection:
+          allOf:
+            - $ref: '#/components/schemas/MisinformationDetectionResult'
+          nullable: true
+          description: >-
+            가짜정보(허위정보) 판별 결과. 텍스트가 전혀 추출되지 않으면 없음(null). 거짓으로
+            판정된 문장만 담기고, claims가 빈 배열이면 검사는 했지만 반박 근거를 못 찾았다는
+            뜻이다("모두 사실"이 아님). 가짜정보 파이프라인 자체가 실패한 경우는 502로 요청
+            전체가 실패한다(scamDetection과 동일 원칙).
         errorCode:
           type: string
           nullable: true
@@ -953,6 +1015,15 @@ components:
           nullable: true
           description: >-
             텍스트가 전혀 추출되지 않으면 null. 영상은 말소리와 화면 글자가 둘 다 없을 때 null이다.
+        misinformationDetection:
+          allOf:
+            - $ref: '#/components/schemas/MisinformationDetectionResult'
+          nullable: true
+          description: >-
+            가짜정보(허위정보) 판별 결과. 텍스트가 전혀 추출되지 않으면 없음(null). 거짓으로
+            판정된 문장만 담기고, claims가 빈 배열이면 검사는 했지만 반박 근거를 못 찾았다는
+            뜻이다("모두 사실"이 아님). 가짜정보 파이프라인 자체가 실패한 경우는 502로 요청
+            전체가 실패한다(scamDetection과 동일 원칙).
         errorCode:
           type: string
           nullable: true
@@ -979,7 +1050,7 @@ components:
 
     AnalysisReportResponse:
       type: object
-      required: [totalCount, imageCount, audioCount, videoCount, aiDetectedCount, scamDetectedCount]
+      required: [totalCount, imageCount, audioCount, videoCount, aiDetectedCount, scamDetectedCount, misinformationDetectedCount]
       description: >-
         완료된 분석 기록 기준 집계. aiDetectedCount/scamDetectedCount는 점수 0.5 이상을
         "탐지됨"으로 판단한 건수다(고정 임계값, 추후 조정 가능).
@@ -1016,6 +1087,12 @@ components:
           nullable: false
           description: 사기 위험으로 판별된(scamScore >= 0.5) 건수.
           example: 2
+        misinformationDetectedCount:
+          type: integer
+          format: int64
+          nullable: false
+          description: 가짜정보(반박된 주장)가 하나 이상 발견된 건수.
+          example: 1
 
     WithdrawalRequest:
       type: object
@@ -1158,6 +1235,77 @@ components:
           maximum: 1
           description: 이 문장이 사기(보이스피싱 등)일 확률(0~1).
           example: 0.95
+
+    MisinformationDetectionResult:
+      type: object
+      required: [model, wikiSnapshot, claims]
+      description: >-
+        가짜정보(허위정보) 판별 결과. 텍스트가 전혀 추출되지 않으면 이 필드 자체가 없다(null).
+        거짓(반박)으로 판정된 문장만 claims에 담긴다 - 참/판단불가는 노출하지 않는다. claims가
+        빈 배열이면 "검사했지만 위키에서 반박되는 내용을 찾지 못했다"는 뜻이지 "모두 사실"이라는
+        뜻이 아니다.
+      properties:
+        model:
+          type: string
+          nullable: false
+          description: 가짜정보 판정에 사용된 로컬 LLM 이름.
+          example: qwen3.5:4b
+        wikiSnapshot:
+          type: string
+          nullable: false
+          description: 대조에 쓴 한국어 위키백과 인덱스의 기준 날짜(YYYY-MM-DD). 이 날짜 이후에
+            바뀐 위키 내용이나 최근 사건은 반영되지 않을 수 있다.
+          example: '2026-09-01'
+        claims:
+          type: array
+          nullable: false
+          description: 거짓으로 판정된 문장 목록. 근거가 없으면 빈 배열.
+          items:
+            $ref: '#/components/schemas/MisinformationClaim'
+
+    MisinformationClaim:
+      type: object
+      required: [sentence, reason, evidence]
+      description: 위키백과 내용과 어긋나는(거짓으로 판정된) 문장 하나.
+      properties:
+        sentence:
+          type: string
+          nullable: false
+          description: 거짓으로 판정된 문장 원문.
+          example: 선풍기를 틀고 자면 사망한다.
+        reason:
+          type: string
+          nullable: false
+          description: 왜 거짓으로 판정했는지 한 문장 설명.
+          example: 근거 문단은 선풍기 사망설을 과학적 근거가 없는 미신이라고 설명합니다.
+        evidence:
+          type: array
+          nullable: false
+          description: 판정에 쓴 위키백과 근거 조각 목록.
+          items:
+            $ref: '#/components/schemas/WikiEvidence'
+
+    WikiEvidence:
+      type: object
+      required: [title, text, url]
+      description: >-
+        가짜정보 판정 근거로 쓴 위키백과 문서 조각. title/url은 위키백과 CC BY-SA 라이선스의
+        출처 표시 요건 때문에 필수다 - 화면에도 "출처: 위키백과" 표기가 필요하다.
+      properties:
+        title:
+          type: string
+          nullable: false
+          example: 선풍기 사망설
+        text:
+          type: string
+          nullable: false
+          description: 근거로 쓰인 위키백과 원문 조각(발췌).
+          example: 선풍기 사망설이란, 밀폐된 방에서 얼굴을 향해 선풍기를 켜놓은 채로 잠을 자면 사망할 수 있다는 미신이다.
+        url:
+          type: string
+          format: uri
+          nullable: false
+          example: https://ko.wikipedia.org/wiki/선풍기_사망설
 
     Evidence:
       type: object
