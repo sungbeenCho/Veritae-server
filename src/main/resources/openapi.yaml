@@ -940,10 +940,11 @@ components:
             - $ref: '#/components/schemas/MisinformationDetectionResult'
           nullable: true
           description: >-
-            가짜정보(허위정보) 판별 결과. 텍스트가 전혀 추출되지 않으면 없음(null). 거짓으로
-            판정된 문장만 담기고, claims가 빈 배열이면 검사는 했지만 반박 근거를 못 찾았다는
-            뜻이다("모두 사실"이 아님). 가짜정보 파이프라인 자체가 실패한 경우는 502로 요청
-            전체가 실패한다(scamDetection과 동일 원칙).
+            status가 COMPLETED이고 분석할 텍스트가 있었을 때만 채워진다. 텍스트가 전혀 없으면
+            없음(null). 거짓으로 판정된 문장만 담기고, claims가 빈 배열이면 검사는 했지만 반박
+            근거를 못 찾았다는 뜻이다("모두 사실"이 아님). 가짜정보 판정 처리 자체가 실패한
+            경우는 이 필드가 조용히 비지 않고 작업 전체가 FAILED가 된다(scamDetection과 동일
+            원칙).
         errorCode:
           type: string
           nullable: true
@@ -1020,10 +1021,10 @@ components:
             - $ref: '#/components/schemas/MisinformationDetectionResult'
           nullable: true
           description: >-
-            가짜정보(허위정보) 판별 결과. 텍스트가 전혀 추출되지 않으면 없음(null). 거짓으로
-            판정된 문장만 담기고, claims가 빈 배열이면 검사는 했지만 반박 근거를 못 찾았다는
-            뜻이다("모두 사실"이 아님). 가짜정보 파이프라인 자체가 실패한 경우는 502로 요청
-            전체가 실패한다(scamDetection과 동일 원칙).
+            텍스트가 전혀 추출되지 않으면 null. 거짓으로 판정된 문장만 담기고, claims가 빈
+            배열이면 검사는 했지만 반박 근거를 못 찾았다는 뜻이다("모두 사실"이 아님). 목록에는
+            완료된 기록만 나오므로 가짜정보 판정 파이프라인이 실패한 기록은 애초에 여기 나오지
+            않는다.
         errorCode:
           type: string
           nullable: true
