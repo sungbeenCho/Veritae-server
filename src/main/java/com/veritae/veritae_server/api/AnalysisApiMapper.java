@@ -30,7 +30,8 @@ public final class AnalysisApiMapper {
         ImageAnalysisResult result = outcome.result();
         var openApiResult = toOpenApiImageResult(result.aiDetection());
         return new ImageAnalysisResponse(outcome.recordId(), openApiResult)
-                .scamDetection(toOpenApiScamDetection(result.scamDetection()));
+                .scamDetection(toOpenApiScamDetection(result.scamDetection()))
+                .misinformationDetection(toOpenApiMisinformationDetection(result.misinformationDetection()));
     }
 
     public static AudioAnalysisResponse toAudioResponse(AnalysisOutcome<AudioAnalysisResult> outcome) {
@@ -38,7 +39,8 @@ public final class AnalysisApiMapper {
         var openApiResult = new com.veritae.veritae_server.openapi.model.AudioDetectionResult(
                 result.aiDetection().model(), result.aiDetection().score(), toOpenApiEvidence(result.aiDetection().evidence()));
         return new AudioAnalysisResponse(outcome.recordId(), openApiResult)
-                .scamDetection(toOpenApiScamDetection(result.scamDetection()));
+                .scamDetection(toOpenApiScamDetection(result.scamDetection()))
+                .misinformationDetection(toOpenApiMisinformationDetection(result.misinformationDetection()));
     }
 
     public static AnalysisJobAcceptedResponse toJobAcceptedResponse(UUID jobId) {
@@ -51,10 +53,12 @@ public final class AnalysisApiMapper {
         // result만 null 체크하면 toOpenApiResult(null) 호출로 NPE가 난다.
         var aiDetection = result != null && result.aiDetection() != null ? toOpenApiResult(result.aiDetection()) : null;
         var scamDetection = result != null ? toOpenApiScamDetection(result.scamDetection()) : null;
+        var misinformationDetection = result != null ? toOpenApiMisinformationDetection(result.misinformationDetection()) : null;
         var status = AnalysisJobResponse.StatusEnum.fromValue(view.status().name());
         return new AnalysisJobResponse(view.jobId(), status)
                 .aiDetection(aiDetection)
                 .scamDetection(scamDetection)
+                .misinformationDetection(misinformationDetection)
                 .errorCode(view.errorCode())
                 .errorMessage(view.errorMessage())
                 .jobsAhead(view.jobsAhead());
@@ -84,6 +88,27 @@ public final class AnalysisApiMapper {
                 .toList();
     }
 
+    private static com.veritae.veritae_server.openapi.model.MisinformationDetectionResult toOpenApiMisinformationDetection(
+            com.veritae.veritae_server.detection.MisinformationDetectionResult misinformationDetection) {
+        if (misinformationDetection == null) {
+            return null;
+        }
+        List<com.veritae.veritae_server.openapi.model.MisinformationClaim> claims = misinformationDetection.claims().stream()
+                .map(c -> new com.veritae.veritae_server.openapi.model.MisinformationClaim(
+                        c.sentence(), c.reason(), toOpenApiWikiEvidence(c.evidence())))
+                .toList();
+        return new com.veritae.veritae_server.openapi.model.MisinformationDetectionResult(
+                misinformationDetection.model(), misinformationDetection.wikiSnapshot(), claims);
+    }
+
+    private static List<com.veritae.veritae_server.openapi.model.WikiEvidence> toOpenApiWikiEvidence(
+            List<com.veritae.veritae_server.detection.WikiEvidence> evidence) {
+        return evidence.stream()
+                .map(e -> new com.veritae.veritae_server.openapi.model.WikiEvidence(
+                        e.title(), e.text(), java.net.URI.create(e.url())))
+                .toList();
+    }
+
     public static com.veritae.veritae_server.openapi.model.AnalysisRecordListResponse toRecordListResponse(
             List<com.veritae.veritae_server.domain.analysisrecord.AnalysisRecord> records) {
         List<com.veritae.veritae_server.openapi.model.AnalysisRecordSummary> content =
@@ -107,6 +132,7 @@ public final class AnalysisApiMapper {
                 ImageAnalysisResult result = readResult(record.getResultJson(), ImageAnalysisResult.class);
                 summary.imageDetection(result.aiDetection() != null ? toOpenApiImageResult(result.aiDetection()) : null);
                 summary.scamDetection(toOpenApiScamDetection(result.scamDetection()));
+                summary.misinformationDetection(toOpenApiMisinformationDetection(result.misinformationDetection()));
             }
             case AUDIO -> {
                 AudioAnalysisResult result = readResult(record.getResultJson(), AudioAnalysisResult.class);
@@ -116,11 +142,13 @@ public final class AnalysisApiMapper {
                                 toOpenApiEvidence(result.aiDetection().evidence()))
                         : null);
                 summary.scamDetection(toOpenApiScamDetection(result.scamDetection()));
+                summary.misinformationDetection(toOpenApiMisinformationDetection(result.misinformationDetection()));
             }
             case VIDEO -> {
                 VideoAnalysisResult result = readResult(record.getResultJson(), VideoAnalysisResult.class);
                 summary.videoDetection(result.aiDetection() != null ? toOpenApiResult(result.aiDetection()) : null);
                 summary.scamDetection(toOpenApiScamDetection(result.scamDetection()));
+                summary.misinformationDetection(toOpenApiMisinformationDetection(result.misinformationDetection()));
             }
         }
         return summary;

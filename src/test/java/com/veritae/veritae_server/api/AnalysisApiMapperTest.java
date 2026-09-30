@@ -8,9 +8,12 @@ import com.veritae.veritae_server.detection.AudioDetectionResult;
 import com.veritae.veritae_server.detection.Evidence;
 import com.veritae.veritae_server.detection.ImageAnalysisResult;
 import com.veritae.veritae_server.detection.ImageDetectionResult;
+import com.veritae.veritae_server.detection.MisinformationClaim;
+import com.veritae.veritae_server.detection.MisinformationDetectionResult;
 import com.veritae.veritae_server.detection.ScamDetectionResult;
 import com.veritae.veritae_server.detection.ScamEvidence;
 import com.veritae.veritae_server.detection.VideoAnalysisResult;
+import com.veritae.veritae_server.detection.WikiEvidence;
 import com.veritae.veritae_server.domain.analysisrecord.AnalysisRecord;
 import com.veritae.veritae_server.domain.analysisrecord.Modality;
 import org.junit.jupiter.api.Test;
@@ -170,5 +173,49 @@ class AnalysisApiMapperTest {
         assertThat(response.getAiDetectedCount()).isEqualTo(3);
         assertThat(response.getScamDetectedCount()).isEqualTo(2);
         assertThat(response.getMisinformationDetectedCount()).isEqualTo(1);
+    }
+
+    @Test
+    void toResponse_shouldIncludeMisinformationDetection() {
+        UUID recordId = UUID.randomUUID();
+        var wikiEvidence = new WikiEvidence(
+                "선풍기 사망설", "선풍기 사망설이란, 밀폐된 방에서 선풍기를 켜놓고 자면 사망할 수 있다는 미신이다.",
+                "https://ko.wikipedia.org/wiki/선풍기_사망설");
+        var claim = new MisinformationClaim(
+                "선풍기를 틀고 자면 사망한다.", "근거 문단은 선풍기 사망설을 과학적 근거가 없는 미신이라고 설명합니다.", List.of(wikiEvidence));
+        var misinformation = new MisinformationDetectionResult("qwen3.5:4b", "2026-09-01", List.of(claim));
+        var result = new ImageAnalysisResult(new ImageDetectionResult("spai", 0.1, null), null, misinformation);
+
+        var response = AnalysisApiMapper.toResponse(new AnalysisOutcome<>(recordId, result));
+
+        assertThat(response.getMisinformationDetection()).isNotNull();
+        assertThat(response.getMisinformationDetection().getModel()).isEqualTo("qwen3.5:4b");
+        assertThat(response.getMisinformationDetection().getClaims()).hasSize(1);
+        var mappedEvidence = response.getMisinformationDetection().getClaims().get(0).getEvidence();
+        assertThat(mappedEvidence).hasSize(1);
+        assertThat(mappedEvidence.get(0).getTitle()).isEqualTo("선풍기 사망설");
+        assertThat(mappedEvidence.get(0).getUrl().toString()).isEqualTo("https://ko.wikipedia.org/wiki/선풍기_사망설");
+    }
+
+    @Test
+    void toRecordSummary_shouldSurviveMisinformationDetectionRoundTrip() throws Exception {
+        var wikiEvidence = new WikiEvidence(
+                "선풍기 사망설", "선풍기 사망설이란, 밀폐된 방에서 선풍기를 켜놓고 자면 사망할 수 있다는 미신이다.",
+                "https://ko.wikipedia.org/wiki/선풍기_사망설");
+        var claim = new MisinformationClaim(
+                "선풍기를 틀고 자면 사망한다.", "근거 문단은 선풍기 사망설을 과학적 근거가 없는 미신이라고 설명합니다.", List.of(wikiEvidence));
+        var misinformation = new MisinformationDetectionResult("qwen3.5:4b", "2026-09-01", List.of(claim));
+        var result = new ImageAnalysisResult(new ImageDetectionResult("spai", 0.87, "base64png"), null, misinformation);
+        var objectMapper = new com.fasterxml.jackson.databind.ObjectMapper();
+        var record = AnalysisRecord.completedSync(
+                UUID.randomUUID(), Modality.IMAGE, objectMapper.writeValueAsString(result), 0.87, null);
+
+        var summary = AnalysisApiMapper.toRecordSummary(record);
+
+        assertThat(summary.getMisinformationDetection()).isNotNull();
+        assertThat(summary.getMisinformationDetection().getClaims()).hasSize(1);
+        var evidence = summary.getMisinformationDetection().getClaims().get(0).getEvidence();
+        assertThat(evidence.get(0).getTitle()).isEqualTo("선풍기 사망설");
+        assertThat(evidence.get(0).getUrl().toString()).isEqualTo("https://ko.wikipedia.org/wiki/선풍기_사망설");
     }
 }
