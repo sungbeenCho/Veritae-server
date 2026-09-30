@@ -5,6 +5,7 @@ import com.veritae.veritae_server.detection.DetectionClient;
 import com.veritae.veritae_server.detection.DetectionServiceException;
 import com.veritae.veritae_server.detection.ImageAnalysisResult;
 import com.veritae.veritae_server.detection.ImageDetectionResult;
+import com.veritae.veritae_server.detection.MisinformationDetectionJson;
 import com.veritae.veritae_server.detection.ScamDetectionJson;
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.io.ByteArrayResource;
@@ -51,7 +52,10 @@ public class SpaiHttpDetectionClient implements DetectionClient {
                     response.aiDetection().model(),
                     response.aiDetection().score(),
                     response.aiDetection().evidenceImage());
-            return new ImageAnalysisResult(aiDetection, ScamDetectionJson.toScamDetection(response.scamDetection()));
+            return new ImageAnalysisResult(
+                    aiDetection,
+                    ScamDetectionJson.toScamDetection(response.scamDetection()),
+                    MisinformationDetectionJson.toMisinformationDetection(response.misinformationDetection()));
         } catch (RestClientException e) {
             throw new DetectionServiceException("탐지 서버 호출에 실패했습니다: " + e.getMessage(), e);
         }
@@ -59,7 +63,8 @@ public class SpaiHttpDetectionClient implements DetectionClient {
 
     private record SpaiResponse(
             @JsonProperty("ai_detection") AiDetection aiDetection,
-            @JsonProperty("scam_detection") ScamDetectionJson.Dto scamDetection) {
+            @JsonProperty("scam_detection") ScamDetectionJson.Dto scamDetection,
+            @JsonProperty("misinformation_detection") MisinformationDetectionJson.Dto misinformationDetection) {
     }
 
     private record AiDetection(

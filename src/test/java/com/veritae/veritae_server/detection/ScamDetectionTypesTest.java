@@ -22,7 +22,7 @@ class ScamDetectionTypesTest {
     void imageAnalysisResult_allowsNullScamDetection() {
         var aiDetection = new ImageDetectionResult("spai", 0.1, null);
 
-        var result = new ImageAnalysisResult(aiDetection, null);
+        var result = new ImageAnalysisResult(aiDetection, null, null);
 
         assertThat(result.aiDetection()).isEqualTo(aiDetection);
         assertThat(result.scamDetection()).isNull();
@@ -32,8 +32,8 @@ class ScamDetectionTypesTest {
     void audioAnalysisResult_andVideoAnalysisResult_exposeAiAndScamDetection() {
         var scamDetection = new ScamDetectionResult("lilju", 0.3, List.of());
 
-        var audioResult = new AudioAnalysisResult(new AudioDetectionResult("antideepfake", 0.1, List.of()), scamDetection);
-        var videoResult = new VideoAnalysisResult(new VideoDetectionResult("dfdc", 0.2, List.of(), null), scamDetection, null);
+        var audioResult = new AudioAnalysisResult(new AudioDetectionResult("antideepfake", 0.1, List.of()), scamDetection, null);
+        var videoResult = new VideoAnalysisResult(new VideoDetectionResult("dfdc", 0.2, List.of(), null), scamDetection, null, null);
 
         assertThat(audioResult.scamDetection()).isEqualTo(scamDetection);
         assertThat(videoResult.scamDetection()).isEqualTo(scamDetection);

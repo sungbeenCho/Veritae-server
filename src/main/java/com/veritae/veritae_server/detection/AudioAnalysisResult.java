@@ -1,4 +1,6 @@
 package com.veritae.veritae_server.detection;
 
-public record AudioAnalysisResult(AudioDetectionResult aiDetection, ScamDetectionResult scamDetection) {
+public record AudioAnalysisResult(
+        AudioDetectionResult aiDetection, ScamDetectionResult scamDetection,
+        MisinformationDetectionResult misinformationDetection) {
 }

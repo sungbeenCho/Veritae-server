@@ -3,6 +3,7 @@ package com.veritae.veritae_server.detection.dfdc;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.veritae.veritae_server.detection.DetectionServiceException;
 import com.veritae.veritae_server.detection.Evidence;
+import com.veritae.veritae_server.detection.MisinformationDetectionJson;
 import com.veritae.veritae_server.detection.ScamDetectionJson;
 import com.veritae.veritae_server.detection.VideoAnalysisResult;
 import com.veritae.veritae_server.detection.VideoDetectionClient;
@@ -71,7 +72,10 @@ public class DfdcHttpDetectionClient implements VideoDetectionClient {
                         response.aiDetection().evidenceImage());
             }
             return new VideoAnalysisResult(
-                    aiDetection, ScamDetectionJson.toScamDetection(response.scamDetection()), response.errorCode());
+                    aiDetection,
+                    ScamDetectionJson.toScamDetection(response.scamDetection()),
+                    MisinformationDetectionJson.toMisinformationDetection(response.misinformationDetection()),
+                    response.errorCode());
         } catch (RestClientResponseException e) {
             throw new DetectionServiceException("탐지 서버 호출에 실패했습니다: " + e.getMessage(), e);
         } catch (RestClientException e) {
@@ -82,6 +86,7 @@ public class DfdcHttpDetectionClient implements VideoDetectionClient {
     private record DfdcResponse(
             @JsonProperty("ai_detection") AiDetection aiDetection,
             @JsonProperty("scam_detection") ScamDetectionJson.Dto scamDetection,
+            @JsonProperty("misinformation_detection") MisinformationDetectionJson.Dto misinformationDetection,
             @JsonProperty("error_code") String errorCode) {
     }
 

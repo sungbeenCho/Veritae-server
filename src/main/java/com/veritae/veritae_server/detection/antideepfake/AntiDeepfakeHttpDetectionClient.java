@@ -9,6 +9,7 @@ import com.veritae.veritae_server.detection.AudioDetectionResult;
 import com.veritae.veritae_server.detection.AudioTooLongException;
 import com.veritae.veritae_server.detection.DetectionServiceException;
 import com.veritae.veritae_server.detection.Evidence;
+import com.veritae.veritae_server.detection.MisinformationDetectionJson;
 import com.veritae.veritae_server.detection.ScamDetectionJson;
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.io.ByteArrayResource;
@@ -67,7 +68,10 @@ public class AntiDeepfakeHttpDetectionClient implements AudioDetectionClient {
                     .map(e -> new Evidence(e.title(), e.description(), e.tags(), e.startSec(), e.endSec()))
                     .toList();
             var aiDetection = new AudioDetectionResult(response.aiDetection().model(), response.aiDetection().score(), evidence);
-            return new AudioAnalysisResult(aiDetection, ScamDetectionJson.toScamDetection(response.scamDetection()));
+            return new AudioAnalysisResult(
+                    aiDetection,
+                    ScamDetectionJson.toScamDetection(response.scamDetection()),
+                    MisinformationDetectionJson.toMisinformationDetection(response.misinformationDetection()));
         } catch (HttpClientErrorException.BadRequest e) {
             if (AUDIO_TOO_LONG.equals(detailCode(e))) {
                 throw new AudioTooLongException("음성 길이가 5분을 초과합니다.");
@@ -93,7 +97,8 @@ public class AntiDeepfakeHttpDetectionClient implements AudioDetectionClient {
 
     private record AntiDeepfakeResponse(
             @JsonProperty("ai_detection") AiDetection aiDetection,
-            @JsonProperty("scam_detection") ScamDetectionJson.Dto scamDetection) {
+            @JsonProperty("scam_detection") ScamDetectionJson.Dto scamDetection,
+            @JsonProperty("misinformation_detection") MisinformationDetectionJson.Dto misinformationDetection) {
     }
 
     private record AiDetection(String model, double score, List<EvidenceDto> evidence) {

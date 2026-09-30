@@ -79,6 +79,46 @@ class AntiDeepfakeHttpDetectionClientTest {
     }
 
     @Test
+    void detectAudio_withMisinformationDetectionInResponse_shouldParseMisinformationDetection() {
+        // Given
+        RestClient.Builder builder = RestClient.builder().baseUrl("http://desktop:8000");
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        server.expect(requestTo("http://desktop:8000/process/audio"))
+                .andExpect(method(POST))
+                .andRespond(withSuccess(
+                        """
+                        {
+                          "ai_detection": {"model": "antideepfake", "score": 0.1, "evidence": []},
+                          "scam_detection": null,
+                          "misinformation_detection": {
+                            "model": "qwen3.5:4b",
+                            "wiki_snapshot": "2026-09-01",
+                            "claims": [
+                              {
+                                "sentence": "선풍기를 틀고 자면 사망한다.",
+                                "reason": "근거 문단이 주장을 부정합니다.",
+                                "evidence": [
+                                  {"title": "선풍기 사망설", "text": "미신이다.", "url": "https://ko.wikipedia.org/wiki/선풍기_사망설"}
+                                ]
+                              }
+                            ]
+                          }
+                        }
+                        """,
+                        MediaType.APPLICATION_JSON));
+        AntiDeepfakeHttpDetectionClient client = new AntiDeepfakeHttpDetectionClient(builder.build());
+
+        // When
+        AudioAnalysisResult result = client.detectAudio("fake-bytes".getBytes(), "test.wav", "audio/wav");
+
+        // Then
+        assertThat(result.misinformationDetection().model()).isEqualTo("qwen3.5:4b");
+        assertThat(result.misinformationDetection().claims()).hasSize(1);
+        assertThat(result.misinformationDetection().claims().get(0).sentence()).isEqualTo("선풍기를 틀고 자면 사망한다.");
+        server.verify();
+    }
+
+    @Test
     void detectAudio_withoutScamDetectionInResponse_shouldParseNull() {
         // Given
         RestClient.Builder builder = RestClient.builder().baseUrl("http://desktop:8000");
