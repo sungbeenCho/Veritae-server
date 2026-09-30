@@ -26,6 +26,8 @@ public interface AnalysisRecordRepository extends JpaRepository<AnalysisRecord, 
 
     long countByMemberIdAndStatusAndScamScoreGreaterThanEqual(UUID memberId, AnalysisJobStatus status, double scamScore);
 
+    long countByMemberIdAndStatusAndMisinfoRefutedCountGreaterThanEqual(UUID memberId, AnalysisJobStatus status, int misinfoRefutedCount);
+
     /** 원본이 남아 있는 회원의 기록(최신순) - 최신 10건 보관 정책 적용용. */
     List<AnalysisRecord> findByMemberIdAndMediaKeyIsNotNullOrderByCreatedAtDesc(UUID memberId);
 

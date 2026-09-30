@@ -38,6 +38,22 @@ class AnalysisRecordTest {
     }
 
     @Test
+    void completedSync_withMisinfoRefutedCount_storesIt() {
+        var record = AnalysisRecord.completedSync(
+                UUID.randomUUID(), Modality.IMAGE, "{}", 0.1, 0.2, 3);
+
+        assertThat(record.getMisinfoRefutedCount()).isEqualTo(3);
+    }
+
+    @Test
+    void completedSync_withoutMisinfoRefutedCount_defaultsToNull() {
+        var record = AnalysisRecord.completedSync(
+                UUID.randomUUID(), Modality.IMAGE, "{}", 0.1, 0.2);
+
+        assertThat(record.getMisinfoRefutedCount()).isNull();
+    }
+
+    @Test
     void markProcessing_shouldTransitionToProcessing() {
         AnalysisRecord record = AnalysisRecord.submit(UUID.randomUUID());
 

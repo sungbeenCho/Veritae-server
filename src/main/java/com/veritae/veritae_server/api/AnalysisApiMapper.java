@@ -130,7 +130,7 @@ public final class AnalysisApiMapper {
             com.veritae.veritae_server.analysis.AnalysisHistoryService.AnalysisReportView view) {
         return new com.veritae.veritae_server.openapi.model.AnalysisReportResponse(
                 view.totalCount(), view.imageCount(), view.audioCount(), view.videoCount(),
-                view.aiDetectedCount(), view.scamDetectedCount());
+                view.aiDetectedCount(), view.scamDetectedCount(), view.misinformationDetectedCount());
     }
 
     private static com.veritae.veritae_server.openapi.model.ImageDetectionResult toOpenApiImageResult(

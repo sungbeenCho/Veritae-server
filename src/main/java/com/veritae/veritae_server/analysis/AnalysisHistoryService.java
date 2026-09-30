@@ -46,11 +46,14 @@ public class AnalysisHistoryService {
                 memberId, AnalysisJobStatus.COMPLETED, RISK_THRESHOLD);
         long scamDetectedCount = analysisRecordRepository.countByMemberIdAndStatusAndScamScoreGreaterThanEqual(
                 memberId, AnalysisJobStatus.COMPLETED, RISK_THRESHOLD);
-        return new AnalysisReportView(total, imageCount, audioCount, videoCount, aiDetectedCount, scamDetectedCount);
+        long misinformationDetectedCount = analysisRecordRepository.countByMemberIdAndStatusAndMisinfoRefutedCountGreaterThanEqual(
+                memberId, AnalysisJobStatus.COMPLETED, 1);
+        return new AnalysisReportView(
+                total, imageCount, audioCount, videoCount, aiDetectedCount, scamDetectedCount, misinformationDetectedCount);
     }
 
     public record AnalysisReportView(
             long totalCount, long imageCount, long audioCount, long videoCount,
-            long aiDetectedCount, long scamDetectedCount) {
+            long aiDetectedCount, long scamDetectedCount, long misinformationDetectedCount) {
     }
 }

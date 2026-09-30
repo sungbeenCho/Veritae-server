@@ -55,6 +55,7 @@ class AnalysisHistoryServiceTest {
         when(analysisRecordRepository.countByMemberIdAndStatusAndModality(memberId, AnalysisJobStatus.COMPLETED, Modality.VIDEO)).thenReturn(5L);
         when(analysisRecordRepository.countByMemberIdAndStatusAndAiScoreGreaterThanEqual(memberId, AnalysisJobStatus.COMPLETED, 0.5)).thenReturn(3L);
         when(analysisRecordRepository.countByMemberIdAndStatusAndScamScoreGreaterThanEqual(memberId, AnalysisJobStatus.COMPLETED, 0.5)).thenReturn(2L);
+        when(analysisRecordRepository.countByMemberIdAndStatusAndMisinfoRefutedCountGreaterThanEqual(memberId, AnalysisJobStatus.COMPLETED, 1)).thenReturn(1L);
 
         AnalysisHistoryService.AnalysisReportView view = analysisHistoryService.getReport(memberId);
 
@@ -64,5 +65,6 @@ class AnalysisHistoryServiceTest {
         assertThat(view.videoCount()).isEqualTo(5);
         assertThat(view.aiDetectedCount()).isEqualTo(3);
         assertThat(view.scamDetectedCount()).isEqualTo(2);
+        assertThat(view.misinformationDetectedCount()).isEqualTo(1);
     }
 }

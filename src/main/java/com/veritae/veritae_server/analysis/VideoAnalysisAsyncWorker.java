@@ -92,15 +92,18 @@ public class VideoAnalysisAsyncWorker {
     private void complete(AnalysisRecord record, VideoAnalysisResult result) {
         Double aiScore = result.aiDetection() != null ? result.aiDetection().score() : null;
         Double scamScore = result.scamDetection() != null ? result.scamDetection().score() : null;
+        Integer misinfoRefutedCount = result.misinformationDetection() != null
+                ? result.misinformationDetection().claims().size() : null;
         if (result.errorCode() != null) {
             // 얼굴없음처럼 일부 판독만 정상적으로 비어있는 경우 - 사기감지 등 나머지 결과가
             // 살아있을 수 있으니 전체 실패가 아니라 부분 성공(COMPLETED)으로 기록한다(2026-09-21,
             // 예전엔 이것도 통째로 FAILED 처리돼서 살아있는 사기감지 결과까지 같이 버려졌었음).
             log.info("영상 분석: 일부 판독 불가 jobId={} errorCode={}", record.getId(), result.errorCode());
             record.markCompletedWithPartialError(
-                    writeResultJson(result), aiScore, scamScore, result.errorCode(), errorMessageFor(result.errorCode()));
+                    writeResultJson(result), aiScore, scamScore, misinfoRefutedCount,
+                    result.errorCode(), errorMessageFor(result.errorCode()));
         } else {
-            record.markCompleted(writeResultJson(result), aiScore, scamScore);
+            record.markCompleted(writeResultJson(result), aiScore, scamScore, misinfoRefutedCount);
         }
     }
 

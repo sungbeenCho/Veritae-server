@@ -39,8 +39,10 @@ public class ImageAnalysisService {
 
         Double aiScore = result.aiDetection() != null ? result.aiDetection().score() : null;
         Double scamScore = result.scamDetection() != null ? result.scamDetection().score() : null;
+        Integer misinfoRefutedCount = result.misinformationDetection() != null
+                ? result.misinformationDetection().claims().size() : null;
         AnalysisRecord record = AnalysisRecord.completedSync(
-                memberId, Modality.IMAGE, writeResultJson(result), aiScore, scamScore);
+                memberId, Modality.IMAGE, writeResultJson(result), aiScore, scamScore, misinfoRefutedCount);
         analysisMediaService.saveRecordWithOriginal(record, bytes, file.getContentType());
 
         return new AnalysisOutcome<>(record.getId(), result);

@@ -25,7 +25,7 @@ class AnalysisApiMapperTest {
     @Test
     void toRecordSummary_withImageRecord_shouldFillImageDetectionOnly() throws Exception {
         var scam = new ScamDetectionResult("lilju", 0.82, List.of(new ScamEvidence("계좌번호를 알려주세요", 0.95)));
-        var result = new ImageAnalysisResult(new ImageDetectionResult("spai", 0.87, "base64png"), scam);
+        var result = new ImageAnalysisResult(new ImageDetectionResult("spai", 0.87, "base64png"), scam, null);
         var objectMapper = new com.fasterxml.jackson.databind.ObjectMapper();
         var record = AnalysisRecord.completedSync(
                 UUID.randomUUID(), Modality.IMAGE, objectMapper.writeValueAsString(result), 0.87, 0.82);
@@ -46,7 +46,7 @@ class AnalysisApiMapperTest {
                 "합성 음성 의심 구간", "1.0초~4.0초 구간에서 부자연스러운 음성 합성 흔적이 감지됨",
                 List.of("temporal"), 1.0, 4.0));
         var scam = new ScamDetectionResult("lilju", 0.82, List.of(new ScamEvidence("계좌번호를 알려주세요", 0.95)));
-        var result = new AudioAnalysisResult(new AudioDetectionResult("antideepfake", 0.73, evidence), scam);
+        var result = new AudioAnalysisResult(new AudioDetectionResult("antideepfake", 0.73, evidence), scam, null);
         var objectMapper = new com.fasterxml.jackson.databind.ObjectMapper();
         var record = AnalysisRecord.completedSync(
                 UUID.randomUUID(), Modality.AUDIO, objectMapper.writeValueAsString(result), 0.73, 0.82);
@@ -68,7 +68,7 @@ class AnalysisApiMapperTest {
     @Test
     void toRecordSummary_withVideoRecord_shouldFillErrorCodeWhenAiDetectionMissing() throws Exception {
         var scam = new ScamDetectionResult("lilju", 0.82, List.of(new ScamEvidence("계좌번호를 알려주세요", 0.95)));
-        var result = new VideoAnalysisResult(null, scam, "NO_FACE_DETECTED");
+        var result = new VideoAnalysisResult(null, scam, null, "NO_FACE_DETECTED");
         var objectMapper = new com.fasterxml.jackson.databind.ObjectMapper();
         // completedSync는 errorCode를 받지 않는다 - 영상은 실제 파이프라인과 동일하게
         // submit(PENDING) 후 markCompletedWithPartialError로 얼굴없음 부분성공을 기록한다.
@@ -91,7 +91,7 @@ class AnalysisApiMapperTest {
     @Test
     void toRecordListResponse_shouldMapContentOnly() throws Exception {
         var objectMapper = new com.fasterxml.jackson.databind.ObjectMapper();
-        var result = new ImageAnalysisResult(new ImageDetectionResult("spai", 0.1, null), null);
+        var result = new ImageAnalysisResult(new ImageDetectionResult("spai", 0.1, null), null, null);
         var record = AnalysisRecord.completedSync(
                 UUID.randomUUID(), Modality.IMAGE, objectMapper.writeValueAsString(result), 0.1, null);
 
@@ -103,7 +103,7 @@ class AnalysisApiMapperTest {
     @Test
     void toResponse_shouldIncludeRecordIdAsId() {
         UUID recordId = UUID.randomUUID();
-        var result = new ImageAnalysisResult(new ImageDetectionResult("spai", 0.1, null), null);
+        var result = new ImageAnalysisResult(new ImageDetectionResult("spai", 0.1, null), null, null);
 
         var response = AnalysisApiMapper.toResponse(new AnalysisOutcome<>(recordId, result));
 
@@ -114,7 +114,7 @@ class AnalysisApiMapperTest {
     @Test
     void toAudioResponse_shouldIncludeRecordIdAsId() {
         UUID recordId = UUID.randomUUID();
-        var result = new AudioAnalysisResult(new AudioDetectionResult("antideepfake", 0.2, List.of()), null);
+        var result = new AudioAnalysisResult(new AudioDetectionResult("antideepfake", 0.2, List.of()), null, null);
 
         var response = AnalysisApiMapper.toAudioResponse(new AnalysisOutcome<>(recordId, result));
 
@@ -127,7 +127,7 @@ class AnalysisApiMapperTest {
         var objectMapper = new com.fasterxml.jackson.databind.ObjectMapper();
         var record = AnalysisRecord.submit(UUID.randomUUID());
         record.markCompletedWithPartialError(
-                objectMapper.writeValueAsString(new VideoAnalysisResult(null, null, "NO_FACE_DETECTED")), null, null,
+                objectMapper.writeValueAsString(new VideoAnalysisResult(null, null, null, "NO_FACE_DETECTED")), null, null,
                 "NO_FACE_DETECTED", "영상에서 얼굴을 찾을 수 없어 AI판독은 제공되지 않습니다.");
 
         var summary = AnalysisApiMapper.toRecordSummary(record);
@@ -138,7 +138,7 @@ class AnalysisApiMapperTest {
     @Test
     void toRecordSummary_shouldReportWhetherOriginalIsAvailable() throws Exception {
         var objectMapper = new com.fasterxml.jackson.databind.ObjectMapper();
-        var json = objectMapper.writeValueAsString(new ImageAnalysisResult(new ImageDetectionResult("spai", 0.1, null), null));
+        var json = objectMapper.writeValueAsString(new ImageAnalysisResult(new ImageDetectionResult("spai", 0.1, null), null, null));
         var withMedia = AnalysisRecord.completedSync(UUID.randomUUID(), Modality.IMAGE, json, 0.1, null);
         withMedia.attachMedia("media/m/r");
         var withoutMedia = AnalysisRecord.completedSync(UUID.randomUUID(), Modality.IMAGE, json, 0.1, null);
@@ -159,7 +159,7 @@ class AnalysisApiMapperTest {
 
     @Test
     void toReportResponse_shouldMapAllCounts() {
-        var view = new AnalysisHistoryService.AnalysisReportView(23, 10, 8, 5, 3, 2);
+        var view = new AnalysisHistoryService.AnalysisReportView(23, 10, 8, 5, 3, 2, 1);
 
         var response = AnalysisApiMapper.toReportResponse(view);
 
@@ -169,5 +169,6 @@ class AnalysisApiMapperTest {
         assertThat(response.getVideoCount()).isEqualTo(5);
         assertThat(response.getAiDetectedCount()).isEqualTo(3);
         assertThat(response.getScamDetectedCount()).isEqualTo(2);
+        assertThat(response.getMisinformationDetectedCount()).isEqualTo(1);
     }
 }

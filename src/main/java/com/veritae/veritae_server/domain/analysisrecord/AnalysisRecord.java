@@ -59,6 +59,12 @@ public class AnalysisRecord {
     @Column(name = "scam_score")
     private Double scamScore;
 
+    // 가짜정보탐지에서 반박(거짓)으로 판정된 문장 개수 - 리포트 집계용(result_json 파싱 없이
+    // 바로 집계 쿼리 가능하게, ai_score/scam_score와 동일한 목적). misinformationDetection
+    // 자체가 없으면(텍스트 없음) null - "검사 안 함"과 "0건 검사했지만 다 사실"을 구분한다.
+    @Column(name = "misinfo_refuted_count")
+    private Integer misinfoRefutedCount;
+
     @Column(name = "error_code", length = 50)
     private String errorCode;
 
@@ -94,11 +100,18 @@ public class AnalysisRecord {
     /** 이미지/음성 전용 — 동기 분석이 이미 끝난 결과를 COMPLETED 상태로 바로 생성(상태 전환 없음). */
     public static AnalysisRecord completedSync(
             UUID memberId, Modality modality, String resultJson, Double aiScore, Double scamScore) {
+        return completedSync(memberId, modality, resultJson, aiScore, scamScore, null);
+    }
+
+    public static AnalysisRecord completedSync(
+            UUID memberId, Modality modality, String resultJson, Double aiScore, Double scamScore,
+            Integer misinfoRefutedCount) {
         Instant now = now();
         AnalysisRecord record = new AnalysisRecord(UUID.randomUUID(), memberId, modality, AnalysisJobStatus.COMPLETED, now);
         record.resultJson = resultJson;
         record.aiScore = aiScore;
         record.scamScore = scamScore;
+        record.misinfoRefutedCount = misinfoRefutedCount;
         return record;
     }
 
@@ -108,19 +121,31 @@ public class AnalysisRecord {
     }
 
     public void markCompleted(String resultJson, Double aiScore, Double scamScore) {
+        markCompleted(resultJson, aiScore, scamScore, null);
+    }
+
+    public void markCompleted(String resultJson, Double aiScore, Double scamScore, Integer misinfoRefutedCount) {
         this.status = AnalysisJobStatus.COMPLETED;
         this.resultJson = resultJson;
         this.aiScore = aiScore;
         this.scamScore = scamScore;
+        this.misinfoRefutedCount = misinfoRefutedCount;
         this.updatedAt = now();
     }
 
     public void markCompletedWithPartialError(
             String resultJson, Double aiScore, Double scamScore, String errorCode, String errorMessage) {
+        markCompletedWithPartialError(resultJson, aiScore, scamScore, null, errorCode, errorMessage);
+    }
+
+    public void markCompletedWithPartialError(
+            String resultJson, Double aiScore, Double scamScore, Integer misinfoRefutedCount,
+            String errorCode, String errorMessage) {
         this.status = AnalysisJobStatus.COMPLETED;
         this.resultJson = resultJson;
         this.aiScore = aiScore;
         this.scamScore = scamScore;
+        this.misinfoRefutedCount = misinfoRefutedCount;
         this.errorCode = errorCode;
         this.errorMessage = errorMessage;
         this.updatedAt = now();
