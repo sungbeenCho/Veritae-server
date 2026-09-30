@@ -1286,7 +1286,9 @@ components:
         evidence:
           type: array
           nullable: false
-          description: 판정에 쓴 위키백과 근거 조각 목록.
+          description: >-
+            거짓 판정이 실제로 인용한 위키백과 근거 목록(검색된 후보 전부가 아니다). 거짓으로 판정된
+            문장에는 항상 1개 이상 있다.
           items:
             $ref: '#/components/schemas/WikiEvidence'
 
@@ -1304,7 +1306,9 @@ components:
         text:
           type: string
           nullable: false
-          description: 근거로 쓰인 위키백과 원문 조각(발췌).
+          description: >-
+            근거로 쓰인 위키백과 원문 발췌. 문맥이 잘리지 않도록 같은 문서의 앞뒤 문단을 이어 붙인
+            것이라 수백 자에서 천 자 이상까지 길어질 수 있다.
           example: 선풍기 사망설이란, 밀폐된 방에서 얼굴을 향해 선풍기를 켜놓은 채로 잠을 자면 사망할 수 있다는 미신이다.
         url:
           type: string
