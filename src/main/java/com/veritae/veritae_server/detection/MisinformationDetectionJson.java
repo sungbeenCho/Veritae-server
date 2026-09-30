@@ -1,5 +1,6 @@
 package com.veritae.veritae_server.detection;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.List;
 
 /**
@@ -14,7 +15,7 @@ public final class MisinformationDetectionJson {
     private MisinformationDetectionJson() {
     }
 
-    public record Dto(String model, String wikiSnapshot, List<ClaimDto> claims) {
+    public record Dto(String model, @JsonProperty("wiki_snapshot") String wikiSnapshot, List<ClaimDto> claims) {
     }
 
     public record ClaimDto(String sentence, String reason, List<WikiEvidenceDto> evidence) {

@@ -1,5 +1,6 @@
 package com.veritae.veritae_server.detection;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -40,5 +41,23 @@ class MisinformationDetectionTypesTest {
         assertThat(result.claims()).hasSize(1);
         assertThat(result.claims().get(0).sentence()).isEqualTo("선풍기를 틀고 자면 사망한다.");
         assertThat(result.claims().get(0).evidence().get(0).title()).isEqualTo("선풍기 사망설");
+    }
+
+    @Test
+    void misinformationDetectionJson_Dto_deserializesSnakeCaseJsonProperty() throws Exception {
+        String jsonPayload = """
+                {
+                  "model": "qwen3.5:4b",
+                  "wiki_snapshot": "2026-09-01",
+                  "claims": []
+                }
+                """;
+        var objectMapper = new ObjectMapper();
+
+        var dto = objectMapper.readValue(jsonPayload, MisinformationDetectionJson.Dto.class);
+
+        assertThat(dto.model()).isEqualTo("qwen3.5:4b");
+        assertThat(dto.wikiSnapshot()).isEqualTo("2026-09-01");
+        assertThat(dto.claims()).isEmpty();
     }
 }
