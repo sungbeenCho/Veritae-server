@@ -97,7 +97,10 @@ public class AnalysisRecord {
         return new AnalysisRecord(UUID.randomUUID(), memberId, Modality.VIDEO, AnalysisJobStatus.PENDING, now);
     }
 
-    /** 이미지/음성 전용 — 동기 분석이 이미 끝난 결과를 COMPLETED 상태로 바로 생성(상태 전환 없음). */
+    /** 이미지/음성 전용 — 동기 분석이 이미 끝난 결과를 COMPLETED 상태로 바로 생성(상태 전환 없음).
+     * 이 5-인자 버전은 misinfoRefutedCount를 항상 null로 둔다 - 기존 테스트 호출부를 그대로
+     * 유지하려고 남겨둔 것일 뿐 운영 코드에서 쓰지 말라는 뜻은 아니다. 가짜정보탐지 결과를
+     * 함께 기록해야 하는 호출부는 6-인자 버전을 쓴다. */
     public static AnalysisRecord completedSync(
             UUID memberId, Modality modality, String resultJson, Double aiScore, Double scamScore) {
         return completedSync(memberId, modality, resultJson, aiScore, scamScore, null);
@@ -120,6 +123,9 @@ public class AnalysisRecord {
         this.updatedAt = now();
     }
 
+    /** 4-인자 버전 - misinfoRefutedCount를 항상 null로 둔다. 기존 테스트 호출부 유지용으로 남겨둔
+     * 것이며 운영 코드에서 금지된 것은 아니다. 가짜정보탐지 결과를 함께 기록해야 하면 5-인자
+     * 버전을 쓴다. */
     public void markCompleted(String resultJson, Double aiScore, Double scamScore) {
         markCompleted(resultJson, aiScore, scamScore, null);
     }
@@ -133,6 +139,9 @@ public class AnalysisRecord {
         this.updatedAt = now();
     }
 
+    /** 5-인자 버전 - misinfoRefutedCount를 항상 null로 둔다. 기존 테스트 호출부 유지용으로 남겨둔
+     * 것이며 운영 코드에서 금지된 것은 아니다. 가짜정보탐지 결과를 함께 기록해야 하면 6-인자
+     * 버전을 쓴다. */
     public void markCompletedWithPartialError(
             String resultJson, Double aiScore, Double scamScore, String errorCode, String errorMessage) {
         markCompletedWithPartialError(resultJson, aiScore, scamScore, null, errorCode, errorMessage);

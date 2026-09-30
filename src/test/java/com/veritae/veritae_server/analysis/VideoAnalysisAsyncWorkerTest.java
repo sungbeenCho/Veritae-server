@@ -73,6 +73,31 @@ class VideoAnalysisAsyncWorkerTest {
     }
 
     @Test
+    void process_withMisinformationClaims_shouldSaveMisinfoRefutedCount() {
+        // Given
+        AnalysisRecord job = AnalysisRecord.submit(UUID.randomUUID());
+        when(analysisRecordRepository.findById(job.getId())).thenReturn(Optional.of(job));
+        var wikiEvidence = new com.veritae.veritae_server.detection.WikiEvidence(
+                "선풍기 사망설", "선풍기 사망설이란 미신이다.", "https://ko.wikipedia.org/wiki/선풍기_사망설");
+        var claims = List.of(
+                new com.veritae.veritae_server.detection.MisinformationClaim(
+                        "선풍기를 틀고 자면 사망한다.", "근거 없음", List.of(wikiEvidence)),
+                new com.veritae.veritae_server.detection.MisinformationClaim(
+                        "다른 거짓 주장", "근거 없음", List.of(wikiEvidence)));
+        var misinformation = new com.veritae.veritae_server.detection.MisinformationDetectionResult(
+                "qwen3.5:4b", "2026-09-01", claims);
+        when(videoDetectionClient.detectVideo(any(), any(), any()))
+                .thenReturn(new VideoAnalysisResult(
+                        new VideoDetectionResult("dfdc", 0.91, List.of(), null), null, misinformation, null));
+
+        // When
+        worker.process(job.getId(), "fake-bytes".getBytes(), "test.mp4", "video/mp4");
+
+        // Then
+        assertThat(job.getMisinfoRefutedCount()).isEqualTo(2);
+    }
+
+    @Test
     void process_withSuccessfulDetection_shouldStoreOriginalAndAttachItToJob() {
         // Given
         UUID memberId = UUID.randomUUID();

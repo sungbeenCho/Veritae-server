@@ -15,6 +15,9 @@ public final class MisinformationDetectionJson {
     private MisinformationDetectionJson() {
     }
 
+    // claims/evidence는 ScamDetectionJson.Dto.evidence와 동일한 전제 - 탐지 서버(misinfo_infer.py)가
+    // 근거가 없을 때도 항상 빈 배열([])을 보내지 null을 보내지 않는다. 그래서 스트림 전에 별도 null
+    // 가드를 두지 않는다(2026-09-30 최종 리뷰에서 의도적으로 확인).
     public record Dto(String model, @JsonProperty("wiki_snapshot") String wikiSnapshot, List<ClaimDto> claims) {
     }
 

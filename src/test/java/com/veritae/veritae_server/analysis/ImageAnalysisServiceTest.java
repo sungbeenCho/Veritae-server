@@ -87,6 +87,30 @@ class ImageAnalysisServiceTest {
     }
 
     @Test
+    void analyzeImage_withMisinformationClaims_shouldSaveMisinfoRefutedCount() throws Exception {
+        var file = new MockMultipartFile("file", "test.jpg", "image/jpeg", "fake-bytes".getBytes());
+        var memberId = java.util.UUID.randomUUID();
+        var wikiEvidence = new com.veritae.veritae_server.detection.WikiEvidence(
+                "선풍기 사망설", "선풍기 사망설이란 미신이다.", "https://ko.wikipedia.org/wiki/선풍기_사망설");
+        var claims = java.util.List.of(
+                new com.veritae.veritae_server.detection.MisinformationClaim(
+                        "선풍기를 틀고 자면 사망한다.", "근거 없음", java.util.List.of(wikiEvidence)),
+                new com.veritae.veritae_server.detection.MisinformationClaim(
+                        "다른 거짓 주장", "근거 없음", java.util.List.of(wikiEvidence)));
+        var misinformation = new com.veritae.veritae_server.detection.MisinformationDetectionResult(
+                "qwen3.5:4b", "2026-09-01", claims);
+        var expected = new ImageAnalysisResult(new ImageDetectionResult("spai", 0.87, null), null, misinformation);
+        when(detectionClient.detectImage(file.getBytes(), "test.jpg", "image/jpeg")).thenReturn(expected);
+
+        imageAnalysisService.analyzeImage(file, memberId);
+
+        var captor = org.mockito.ArgumentCaptor.forClass(
+                com.veritae.veritae_server.domain.analysisrecord.AnalysisRecord.class);
+        org.mockito.Mockito.verify(analysisRecordRepository).save(captor.capture());
+        assertThat(captor.getValue().getMisinfoRefutedCount()).isEqualTo(2);
+    }
+
+    @Test
     void analyzeImage_withValidJpeg_shouldReturnIdOfSavedRecord() throws Exception {
         var file = new MockMultipartFile("file", "test.jpg", "image/jpeg", "fake-bytes".getBytes());
         var memberId = java.util.UUID.randomUUID();

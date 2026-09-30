@@ -55,6 +55,20 @@ class AnalysisRecordRepositoryTest {
     }
 
     @Test
+    void countByMemberIdAndStatusAndMisinfoRefutedCountGreaterThanEqual_shouldExcludeNullAndZeroAndWrongStatus() {
+        UUID memberId = UUID.randomUUID();
+        repository.save(AnalysisRecord.completedSync(memberId, Modality.IMAGE, "{}", null, null, null)); // 텍스트 없음 - 검사 안 함
+        repository.save(AnalysisRecord.completedSync(memberId, Modality.AUDIO, "{}", null, null, 0)); // 검사했지만 반박 없음
+        repository.save(AnalysisRecord.completedSync(memberId, Modality.VIDEO, "{}", null, null, 2)); // 반박 2건
+        repository.save(AnalysisRecord.submit(memberId)); // PENDING - 상태 필터로 제외돼야 함
+
+        long count = repository.countByMemberIdAndStatusAndMisinfoRefutedCountGreaterThanEqual(
+                memberId, AnalysisJobStatus.COMPLETED, 1);
+
+        assertThat(count).isEqualTo(1);
+    }
+
+    @Test
     void findByMemberIdAndMediaKeyIsNotNullOrderByCreatedAtDesc_shouldReturnOnlyThatMembersRecordsWithMediaNewestFirst()
             throws InterruptedException {
         UUID memberId = UUID.randomUUID();

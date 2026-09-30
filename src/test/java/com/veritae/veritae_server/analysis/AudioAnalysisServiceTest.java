@@ -112,6 +112,30 @@ class AudioAnalysisServiceTest {
     }
 
     @Test
+    void analyzeAudio_withMisinformationClaims_shouldSaveMisinfoRefutedCount() throws Exception {
+        var file = new MockMultipartFile("file", "test.wav", "audio/wav", "fake-bytes".getBytes());
+        var memberId = java.util.UUID.randomUUID();
+        var wikiEvidence = new com.veritae.veritae_server.detection.WikiEvidence(
+                "선풍기 사망설", "선풍기 사망설이란 미신이다.", "https://ko.wikipedia.org/wiki/선풍기_사망설");
+        var claims = List.of(
+                new com.veritae.veritae_server.detection.MisinformationClaim(
+                        "선풍기를 틀고 자면 사망한다.", "근거 없음", List.of(wikiEvidence)),
+                new com.veritae.veritae_server.detection.MisinformationClaim(
+                        "다른 거짓 주장", "근거 없음", List.of(wikiEvidence)));
+        var misinformation = new com.veritae.veritae_server.detection.MisinformationDetectionResult(
+                "qwen3.5:4b", "2026-09-01", claims);
+        var expected = new AudioAnalysisResult(new AudioDetectionResult("antideepfake", 0.87, List.of()), null, misinformation);
+        when(audioDetectionClient.detectAudio(file.getBytes(), "test.wav", "audio/wav")).thenReturn(expected);
+
+        audioAnalysisService.analyzeAudio(file, memberId);
+
+        var captor = org.mockito.ArgumentCaptor.forClass(
+                com.veritae.veritae_server.domain.analysisrecord.AnalysisRecord.class);
+        org.mockito.Mockito.verify(analysisRecordRepository).save(captor.capture());
+        assertThat(captor.getValue().getMisinfoRefutedCount()).isEqualTo(2);
+    }
+
+    @Test
     void analyzeAudio_withValidWav_shouldReturnIdOfSavedRecordAndStoreOriginal() throws Exception {
         var file = new MockMultipartFile("file", "test.m4a", "audio/mp4", "fake-bytes".getBytes());
         var memberId = java.util.UUID.randomUUID();
