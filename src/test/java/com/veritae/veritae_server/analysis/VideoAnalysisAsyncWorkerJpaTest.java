@@ -81,7 +81,7 @@ class VideoAnalysisAsyncWorkerJpaTest {
         VideoDetectionClient detectionClient = mock(VideoDetectionClient.class);
         when(detectionClient.detectVideo(any(), any(), any())).thenAnswer(invocation -> {
             repository.deleteAllByMemberId(memberId); // 분석하는 동안 탈퇴
-            return new VideoAnalysisResult(new VideoDetectionResult("dfdc", 0.91, List.of(), null), null, null);
+            return new VideoAnalysisResult(new VideoDetectionResult("dfdc", 0.91, List.of(), null), null, null, null);
         });
         VideoAnalysisAsyncWorker worker = new VideoAnalysisAsyncWorker(detectionClient, repository,
                 new AnalysisMediaService(storage, repository), transactionTemplate);
@@ -99,7 +99,7 @@ class VideoAnalysisAsyncWorkerJpaTest {
         InMemoryMediaStorage storage = new InMemoryMediaStorage();
         VideoDetectionClient detectionClient = mock(VideoDetectionClient.class);
         when(detectionClient.detectVideo(any(), any(), any())).thenReturn(
-                new VideoAnalysisResult(new VideoDetectionResult("dfdc", 0.91, List.of(), null), null, null));
+                new VideoAnalysisResult(new VideoDetectionResult("dfdc", 0.91, List.of(), null), null, null, null));
         VideoAnalysisAsyncWorker worker = new VideoAnalysisAsyncWorker(detectionClient, repository,
                 new AnalysisMediaService(storage, repository), transactionTemplate);
 

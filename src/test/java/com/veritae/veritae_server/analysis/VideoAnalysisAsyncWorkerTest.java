@@ -60,7 +60,7 @@ class VideoAnalysisAsyncWorkerTest {
         when(analysisRecordRepository.findById(job.getId())).thenReturn(Optional.of(job));
         when(videoDetectionClient.detectVideo(any(), any(), any()))
                 .thenReturn(new VideoAnalysisResult(
-                        new VideoDetectionResult("dfdc", 0.91, List.of(), "base64png"), null, null));
+                        new VideoDetectionResult("dfdc", 0.91, List.of(), "base64png"), null, null, null));
 
         // When
         worker.process(job.getId(), "fake-bytes".getBytes(), "test.mp4", "video/mp4");
@@ -80,7 +80,7 @@ class VideoAnalysisAsyncWorkerTest {
         when(analysisRecordRepository.findById(job.getId())).thenReturn(Optional.of(job));
         when(videoDetectionClient.detectVideo(any(), any(), any()))
                 .thenReturn(new VideoAnalysisResult(
-                        new VideoDetectionResult("dfdc", 0.91, List.of(), null), null, null));
+                        new VideoDetectionResult("dfdc", 0.91, List.of(), null), null, null, null));
 
         // When
         worker.process(job.getId(), "fake-bytes".getBytes(), "test.mp4", "video/mp4");
@@ -118,7 +118,7 @@ class VideoAnalysisAsyncWorkerTest {
         AnalysisRecord job = AnalysisRecord.submit(UUID.randomUUID());
         when(analysisRecordRepository.findById(job.getId())).thenReturn(Optional.of(job));
         when(videoDetectionClient.detectVideo(any(), any(), any()))
-                .thenReturn(new VideoAnalysisResult(null, null, "NO_FACE_DETECTED"));
+                .thenReturn(new VideoAnalysisResult(null, null, null, "NO_FACE_DETECTED"));
 
         // When
         worker.process(job.getId(), "fake-bytes".getBytes(), "test.mp4", "video/mp4");
@@ -139,7 +139,7 @@ class VideoAnalysisAsyncWorkerTest {
         var scamDetection = new ScamDetectionResult(
                 "lilju", 0.82, List.of(new ScamEvidence("계좌번호를 알려주세요", 0.95)));
         when(videoDetectionClient.detectVideo(any(), any(), any()))
-                .thenReturn(new VideoAnalysisResult(null, scamDetection, "NO_FACE_DETECTED"));
+                .thenReturn(new VideoAnalysisResult(null, scamDetection, null, "NO_FACE_DETECTED"));
 
         // When
         worker.process(job.getId(), "fake-bytes".getBytes(), "test.mp4", "video/mp4");
@@ -198,7 +198,7 @@ class VideoAnalysisAsyncWorkerTest {
                 .thenReturn(Optional.empty());     // 결과 저장 시점
         when(videoDetectionClient.detectVideo(any(), any(), any()))
                 .thenReturn(new VideoAnalysisResult(
-                        new VideoDetectionResult("dfdc", 0.91, List.of(), null), null, null));
+                        new VideoDetectionResult("dfdc", 0.91, List.of(), null), null, null, null));
 
         // When
         worker.process(job.getId(), "fake-bytes".getBytes(), "test.mp4", "video/mp4");

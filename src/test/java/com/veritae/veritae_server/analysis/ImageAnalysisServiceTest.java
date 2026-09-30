@@ -38,7 +38,7 @@ class ImageAnalysisServiceTest {
     void analyzeImage_withValidJpeg_shouldReturnAnalysisResult() throws Exception {
         var file = new MockMultipartFile("file", "test.jpg", "image/jpeg", "fake-bytes".getBytes());
         var memberId = java.util.UUID.randomUUID();
-        var expected = new ImageAnalysisResult(new ImageDetectionResult("spai", 0.87, null), null);
+        var expected = new ImageAnalysisResult(new ImageDetectionResult("spai", 0.87, null), null, null);
         when(detectionClient.detectImage(file.getBytes(), "test.jpg", "image/jpeg")).thenReturn(expected);
 
         ImageAnalysisResult result = imageAnalysisService.analyzeImage(file, memberId).result();
@@ -73,7 +73,7 @@ class ImageAnalysisServiceTest {
     void analyzeImage_withValidJpeg_shouldSaveCompletedAnalysisRecord() throws Exception {
         var file = new MockMultipartFile("file", "test.jpg", "image/jpeg", "fake-bytes".getBytes());
         var memberId = java.util.UUID.randomUUID();
-        var expected = new ImageAnalysisResult(new ImageDetectionResult("spai", 0.87, null), null);
+        var expected = new ImageAnalysisResult(new ImageDetectionResult("spai", 0.87, null), null, null);
         when(detectionClient.detectImage(file.getBytes(), "test.jpg", "image/jpeg")).thenReturn(expected);
 
         imageAnalysisService.analyzeImage(file, memberId);
@@ -91,7 +91,7 @@ class ImageAnalysisServiceTest {
         var file = new MockMultipartFile("file", "test.jpg", "image/jpeg", "fake-bytes".getBytes());
         var memberId = java.util.UUID.randomUUID();
         when(detectionClient.detectImage(file.getBytes(), "test.jpg", "image/jpeg"))
-                .thenReturn(new ImageAnalysisResult(new ImageDetectionResult("spai", 0.87, null), null));
+                .thenReturn(new ImageAnalysisResult(new ImageDetectionResult("spai", 0.87, null), null, null));
 
         var outcome = imageAnalysisService.analyzeImage(file, memberId);
 
@@ -106,7 +106,7 @@ class ImageAnalysisServiceTest {
         var file = new MockMultipartFile("file", "test.jpg", "image/jpeg", "fake-bytes".getBytes());
         var memberId = java.util.UUID.randomUUID();
         when(detectionClient.detectImage(file.getBytes(), "test.jpg", "image/jpeg"))
-                .thenReturn(new ImageAnalysisResult(new ImageDetectionResult("spai", 0.87, null), null));
+                .thenReturn(new ImageAnalysisResult(new ImageDetectionResult("spai", 0.87, null), null, null));
 
         imageAnalysisService.analyzeImage(file, memberId);
 
@@ -126,7 +126,7 @@ class ImageAnalysisServiceTest {
         var file = new MockMultipartFile("file", "test.jpg", "image/jpeg", "fake-bytes".getBytes());
         var memberId = java.util.UUID.randomUUID();
         when(detectionClient.detectImage(file.getBytes(), "test.jpg", "image/jpeg"))
-                .thenReturn(new ImageAnalysisResult(new ImageDetectionResult("spai", 0.87, null), null));
+                .thenReturn(new ImageAnalysisResult(new ImageDetectionResult("spai", 0.87, null), null, null));
 
         imageAnalysisService.analyzeImage(file, memberId);
 

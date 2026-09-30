@@ -78,7 +78,7 @@ class AnalysisApiControllerTest {
         java.util.UUID memberId = java.util.UUID.randomUUID();
         when(authenticatedMemberResolver.currentMemberId()).thenReturn(memberId);
         when(imageAnalysisService.analyzeImage(any(), any()))
-                .thenReturn(new AnalysisOutcome<>(java.util.UUID.randomUUID(), new ImageAnalysisResult(new ImageDetectionResult("spai", 0.87, null), null)));
+                .thenReturn(new AnalysisOutcome<>(java.util.UUID.randomUUID(), new ImageAnalysisResult(new ImageDetectionResult("spai", 0.87, null), null, null)));
 
         mockMvc.perform(multipart("/api/v1/analysis/image").file(file))
                 .andExpect(status().isOk())
@@ -94,7 +94,7 @@ class AnalysisApiControllerTest {
         when(authenticatedMemberResolver.currentMemberId()).thenReturn(memberId);
         var scamDetection = new ScamDetectionResult("lilju", 0.82, List.of(new ScamEvidence("계좌번호를 알려주세요", 0.95)));
         when(imageAnalysisService.analyzeImage(any(), any()))
-                .thenReturn(new AnalysisOutcome<>(java.util.UUID.randomUUID(), new ImageAnalysisResult(new ImageDetectionResult("spai", 0.87, null), scamDetection)));
+                .thenReturn(new AnalysisOutcome<>(java.util.UUID.randomUUID(), new ImageAnalysisResult(new ImageDetectionResult("spai", 0.87, null), scamDetection, null)));
 
         mockMvc.perform(multipart("/api/v1/analysis/image").file(file))
                 .andExpect(status().isOk())
@@ -117,7 +117,7 @@ class AnalysisApiControllerTest {
         java.util.UUID memberId = java.util.UUID.randomUUID();
         when(authenticatedMemberResolver.currentMemberId()).thenReturn(memberId);
         when(imageAnalysisService.analyzeImage(any(), any()))
-                .thenReturn(new AnalysisOutcome<>(java.util.UUID.randomUUID(), new ImageAnalysisResult(new ImageDetectionResult("spai", 0.87, null), null)));
+                .thenReturn(new AnalysisOutcome<>(java.util.UUID.randomUUID(), new ImageAnalysisResult(new ImageDetectionResult("spai", 0.87, null), null, null)));
 
         mockMvc.perform(multipart("/api/v1/analysis/image").file(file))
                 .andExpect(status().isOk());
@@ -142,7 +142,7 @@ class AnalysisApiControllerTest {
                         "antideepfake", 0.87,
                         List.of(new Evidence(
                                 "시간 구간 이상 패턴", "0.5초~1.2초 구간에서 합성 흔적이 감지됨",
-                                List.of("temporal"), 0.5, 1.2))), null)));
+                                List.of("temporal"), 0.5, 1.2))), null, null)));
 
         mockMvc.perform(multipart("/api/v1/analysis/audio").file(file))
                 .andExpect(status().isOk())
@@ -195,7 +195,7 @@ class AnalysisApiControllerTest {
                         new VideoAnalysisResult(new VideoDetectionResult("dfdc", 0.91,
                                 List.of(new Evidence("얼굴 조작 의심 구간", "3.0초~7.0초 구간에서 얼굴 합성 흔적이 감지됨",
                                         List.of("temporal", "face-swap"), 3.0, 7.0)),
-                                "base64pngdata"), null, null),
+                                "base64pngdata"), null, null, null),
                         null,
                         null,
                         null));
@@ -224,7 +224,7 @@ class AnalysisApiControllerTest {
                 new com.veritae.veritae_server.analysis.AnalysisJobView(
                         jobId,
                         com.veritae.veritae_server.domain.analysisrecord.AnalysisJobStatus.COMPLETED,
-                        new VideoAnalysisResult(null, scamDetection, "NO_FACE_DETECTED"),
+                        new VideoAnalysisResult(null, scamDetection, null, "NO_FACE_DETECTED"),
                         "NO_FACE_DETECTED",
                         "영상에서 얼굴을 찾을 수 없어 AI판독은 제공되지 않습니다.",
                         null));
@@ -264,7 +264,7 @@ class AnalysisApiControllerTest {
         java.util.UUID memberId = java.util.UUID.randomUUID();
         when(authenticatedMemberResolver.currentMemberId()).thenReturn(memberId);
         var objectMapper = new com.fasterxml.jackson.databind.ObjectMapper();
-        var result = new ImageAnalysisResult(new ImageDetectionResult("spai", 0.1, null), null);
+        var result = new ImageAnalysisResult(new ImageDetectionResult("spai", 0.1, null), null, null);
         var record = com.veritae.veritae_server.domain.analysisrecord.AnalysisRecord.completedSync(
                 memberId, com.veritae.veritae_server.domain.analysisrecord.Modality.IMAGE,
                 objectMapper.writeValueAsString(result), 0.1, null);
@@ -295,7 +295,7 @@ class AnalysisApiControllerTest {
         java.util.UUID memberId = java.util.UUID.randomUUID();
         when(authenticatedMemberResolver.currentMemberId()).thenReturn(memberId);
         when(analysisHistoryService.getReport(memberId)).thenReturn(
-                new com.veritae.veritae_server.analysis.AnalysisHistoryService.AnalysisReportView(23, 10, 8, 5, 3, 2));
+                new com.veritae.veritae_server.analysis.AnalysisHistoryService.AnalysisReportView(23, 10, 8, 5, 3, 2, 0));
 
         mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
                         .get("/api/v1/analysis/report"))
@@ -318,7 +318,7 @@ class AnalysisApiControllerTest {
         java.util.UUID recordId = java.util.UUID.randomUUID();
         when(authenticatedMemberResolver.currentMemberId()).thenReturn(java.util.UUID.randomUUID());
         when(imageAnalysisService.analyzeImage(any(), any())).thenReturn(new AnalysisOutcome<>(recordId,
-                new ImageAnalysisResult(new ImageDetectionResult("spai", 0.87, null), null)));
+                new ImageAnalysisResult(new ImageDetectionResult("spai", 0.87, null), null, null)));
 
         mockMvc.perform(multipart("/api/v1/analysis/image").file(file))
                 .andExpect(status().isOk())

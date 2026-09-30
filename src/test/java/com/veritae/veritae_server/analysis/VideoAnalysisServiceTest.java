@@ -107,7 +107,7 @@ class VideoAnalysisServiceTest {
         UUID memberId = UUID.randomUUID();
         AnalysisRecord job = AnalysisRecord.submit(memberId);
         job.markCompleted(objectMapper.writeValueAsString(
-                new VideoAnalysisResult(new VideoDetectionResult("dfdc", 0.91, List.of(), null), null, null)), 0.91, null);
+                new VideoAnalysisResult(new VideoDetectionResult("dfdc", 0.91, List.of(), null), null, null, null)), 0.91, null);
         when(analysisRecordRepository.findById(job.getId())).thenReturn(Optional.of(job));
 
         // When

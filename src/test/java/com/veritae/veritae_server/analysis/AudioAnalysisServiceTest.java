@@ -40,7 +40,7 @@ class AudioAnalysisServiceTest {
     void analyzeAudio_withValidWav_shouldReturnAnalysisResult() throws Exception {
         var file = new MockMultipartFile("file", "test.wav", "audio/wav", "fake-bytes".getBytes());
         var memberId = java.util.UUID.randomUUID();
-        var expected = new AudioAnalysisResult(new AudioDetectionResult("antideepfake", 0.87, List.of()), null);
+        var expected = new AudioAnalysisResult(new AudioDetectionResult("antideepfake", 0.87, List.of()), null, null);
         when(audioDetectionClient.detectAudio(file.getBytes(), "test.wav", "audio/wav")).thenReturn(expected);
 
         AudioAnalysisResult result = audioAnalysisService.analyzeAudio(file, memberId).result();
@@ -98,7 +98,7 @@ class AudioAnalysisServiceTest {
     void analyzeAudio_withValidWav_shouldSaveCompletedAnalysisRecord() throws Exception {
         var file = new MockMultipartFile("file", "test.wav", "audio/wav", "fake-bytes".getBytes());
         var memberId = java.util.UUID.randomUUID();
-        var expected = new AudioAnalysisResult(new AudioDetectionResult("antideepfake", 0.87, List.of()), null);
+        var expected = new AudioAnalysisResult(new AudioDetectionResult("antideepfake", 0.87, List.of()), null, null);
         when(audioDetectionClient.detectAudio(file.getBytes(), "test.wav", "audio/wav")).thenReturn(expected);
 
         audioAnalysisService.analyzeAudio(file, memberId);
@@ -116,7 +116,7 @@ class AudioAnalysisServiceTest {
         var file = new MockMultipartFile("file", "test.m4a", "audio/mp4", "fake-bytes".getBytes());
         var memberId = java.util.UUID.randomUUID();
         when(audioDetectionClient.detectAudio(file.getBytes(), "test.m4a", "audio/mp4"))
-                .thenReturn(new AudioAnalysisResult(new AudioDetectionResult("antideepfake", 0.87, List.of()), null));
+                .thenReturn(new AudioAnalysisResult(new AudioDetectionResult("antideepfake", 0.87, List.of()), null, null));
 
         var outcome = audioAnalysisService.analyzeAudio(file, memberId);
 
