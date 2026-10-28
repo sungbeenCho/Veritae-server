@@ -9,6 +9,7 @@ import com.veritae.veritae_server.media.InMemoryMediaStorage;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.dao.OptimisticLockingFailureException;
@@ -18,6 +19,10 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.UUID;
 
@@ -36,6 +41,17 @@ import static org.mockito.Mockito.when;
 @DataJpaTest
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 class VideoAnalysisAsyncWorkerJpaTest {
+
+    @TempDir
+    Path tempDir;
+
+    private Path videoFile() {
+        try {
+            return Files.write(tempDir.resolve("video-" + UUID.randomUUID() + ".upload"), "fake-bytes".getBytes());
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
 
     @Autowired
     private AnalysisRecordRepository repository;
@@ -86,7 +102,7 @@ class VideoAnalysisAsyncWorkerJpaTest {
         VideoAnalysisAsyncWorker worker = new VideoAnalysisAsyncWorker(detectionClient, repository,
                 new AnalysisMediaService(storage, repository), transactionTemplate);
 
-        worker.process(job.getId(), "fake-bytes".getBytes(), "test.mp4", "video/mp4");
+        worker.process(job.getId(), videoFile(), "test.mp4", "video/mp4");
 
         assertThat(repository.existsById(job.getId())).isFalse();
         assertThat(storage.objects()).isEmpty();
@@ -103,7 +119,7 @@ class VideoAnalysisAsyncWorkerJpaTest {
         VideoAnalysisAsyncWorker worker = new VideoAnalysisAsyncWorker(detectionClient, repository,
                 new AnalysisMediaService(storage, repository), transactionTemplate);
 
-        worker.process(job.getId(), "fake-bytes".getBytes(), "test.mp4", "video/mp4");
+        worker.process(job.getId(), videoFile(), "test.mp4", "video/mp4");
 
         AnalysisRecord reloaded = repository.findById(job.getId()).orElseThrow();
         assertThat(reloaded.getStatus())

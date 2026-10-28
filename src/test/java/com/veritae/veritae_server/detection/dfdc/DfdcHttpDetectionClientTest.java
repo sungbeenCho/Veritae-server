@@ -3,9 +3,16 @@ package com.veritae.veritae_server.detection.dfdc;
 import com.veritae.veritae_server.detection.VideoAnalysisResult;
 import com.veritae.veritae_server.detection.DetectionServiceException;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
+
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -16,6 +23,17 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
 class DfdcHttpDetectionClientTest {
+
+    @TempDir
+    Path tempDir;
+
+    private Path videoFile() {
+        try {
+            return Files.write(tempDir.resolve("video-" + UUID.randomUUID() + ".upload"), "fake-bytes".getBytes());
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
 
     @Test
     void detectVideo_withSuccessResponse_shouldParseScoreEvidenceAndEvidenceImage() {
@@ -35,7 +53,7 @@ class DfdcHttpDetectionClientTest {
         DfdcHttpDetectionClient client = new DfdcHttpDetectionClient(builder.build());
 
         // When
-        VideoAnalysisResult result = client.detectVideo("fake-bytes".getBytes(), "test.mp4", "video/mp4");
+        VideoAnalysisResult result = client.detectVideo(videoFile(), "test.mp4", "video/mp4");
 
         // Then
         assertThat(result.aiDetection().model()).isEqualTo("dfdc");
@@ -62,7 +80,7 @@ class DfdcHttpDetectionClientTest {
         DfdcHttpDetectionClient client = new DfdcHttpDetectionClient(builder.build());
 
         // When
-        VideoAnalysisResult result = client.detectVideo("fake-bytes".getBytes(), "test.mp4", "video/mp4");
+        VideoAnalysisResult result = client.detectVideo(videoFile(), "test.mp4", "video/mp4");
 
         // Then
         assertThat(result.aiDetection().evidenceImage()).isNull();
@@ -88,7 +106,7 @@ class DfdcHttpDetectionClientTest {
         DfdcHttpDetectionClient client = new DfdcHttpDetectionClient(builder.build());
 
         // When
-        VideoAnalysisResult result = client.detectVideo("fake-bytes".getBytes(), "test.mp4", "video/mp4");
+        VideoAnalysisResult result = client.detectVideo(videoFile(), "test.mp4", "video/mp4");
 
         // Then
         assertThat(result.scamDetection().model()).isEqualTo("lilju");
@@ -128,7 +146,7 @@ class DfdcHttpDetectionClientTest {
         DfdcHttpDetectionClient client = new DfdcHttpDetectionClient(builder.build());
 
         // When
-        VideoAnalysisResult result = client.detectVideo("fake-bytes".getBytes(), "test.mp4", "video/mp4");
+        VideoAnalysisResult result = client.detectVideo(videoFile(), "test.mp4", "video/mp4");
 
         // Then
         assertThat(result.misinformationDetection().model()).isEqualTo("qwen3.5:4b");
@@ -155,7 +173,7 @@ class DfdcHttpDetectionClientTest {
         DfdcHttpDetectionClient client = new DfdcHttpDetectionClient(builder.build());
 
         // When
-        VideoAnalysisResult result = client.detectVideo("fake-bytes".getBytes(), "test.mp4", "video/mp4");
+        VideoAnalysisResult result = client.detectVideo(videoFile(), "test.mp4", "video/mp4");
 
         // Then
         assertThat(result.scamDetection()).isNull();
@@ -171,7 +189,7 @@ class DfdcHttpDetectionClientTest {
         DfdcHttpDetectionClient client = new DfdcHttpDetectionClient(builder.build());
 
         // When / Then
-        assertThatThrownBy(() -> client.detectVideo("fake-bytes".getBytes(), "test.mp4", "video/mp4"))
+        assertThatThrownBy(() -> client.detectVideo(videoFile(), "test.mp4", "video/mp4"))
                 .isInstanceOf(DetectionServiceException.class);
     }
 
@@ -190,7 +208,7 @@ class DfdcHttpDetectionClientTest {
         DfdcHttpDetectionClient client = new DfdcHttpDetectionClient(builder.build());
 
         // When
-        VideoAnalysisResult result = client.detectVideo("fake-bytes".getBytes(), "test.mp4", "video/mp4");
+        VideoAnalysisResult result = client.detectVideo(videoFile(), "test.mp4", "video/mp4");
 
         // Then
         assertThat(result.aiDetection()).isNull();
@@ -214,7 +232,7 @@ class DfdcHttpDetectionClientTest {
         DfdcHttpDetectionClient client = new DfdcHttpDetectionClient(builder.build());
 
         // When
-        VideoAnalysisResult result = client.detectVideo("fake-bytes".getBytes(), "test.mp4", "video/mp4");
+        VideoAnalysisResult result = client.detectVideo(videoFile(), "test.mp4", "video/mp4");
 
         // Then
         assertThat(result.aiDetection()).isNull();

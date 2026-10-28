@@ -13,6 +13,8 @@ import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import software.amazon.awssdk.services.s3.model.S3Exception;
 import software.amazon.awssdk.services.s3.model.S3Object;
 
+import java.nio.file.Path;
+
 /**
  * Cloudflare R2 구현. 저장된 파일은 R2 가 자동으로 암호화(AES-256)해서 보관한다 - 별도 암호화 코드가
  * 없는 이유. Range 요청은 R2 가 직접 처리하고, 여기서는 받은 Range 값을 그대로 넘기기만 한다.
@@ -43,6 +45,16 @@ public class R2MediaStorage implements MediaStorage, AutoCloseable {
                         .contentLength((long) bytes.length)
                         .build(),
                 RequestBody.fromBytes(bytes));
+    }
+
+    @Override
+    public void put(String key, Path file, String contentType) {
+        s3Client.putObject(PutObjectRequest.builder()
+                        .bucket(bucket)
+                        .key(key)
+                        .contentType(contentType)
+                        .build(),
+                RequestBody.fromFile(file));
     }
 
     @Override

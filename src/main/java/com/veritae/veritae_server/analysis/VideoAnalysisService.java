@@ -12,6 +12,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.nio.file.Path;
 import java.util.Set;
 import java.util.UUID;
 
@@ -35,20 +36,22 @@ public class VideoAnalysisService {
 
     private final AnalysisRecordRepository analysisRecordRepository;
     private final VideoAnalysisAsyncWorker videoAnalysisAsyncWorker;
+    private final VideoUploadFiles videoUploadFiles;
 
     public UUID submitVideo(MultipartFile file, UUID memberId) {
         validate(file);
-        byte[] videoBytes;
+        Path videoFile = videoUploadFiles.save(file);
+
+        AnalysisRecord record;
         try {
-            videoBytes = file.getBytes();
-        } catch (IOException e) {
-            throw new UncheckedIOException("업로드된 파일을 읽을 수 없습니다.", e);
+            record = AnalysisRecord.submit(memberId);
+            analysisRecordRepository.save(record);
+            videoAnalysisAsyncWorker.process(record.getId(), videoFile, file.getOriginalFilename(), file.getContentType());
+        } catch (RuntimeException e) {
+            // 대기열이 가득 차 거절됐거나 기록 저장이 실패하면 처리할 쪽이 없으므로 파일을 여기서 지운다.
+            VideoUploadFiles.deleteQuietly(videoFile);
+            throw e;
         }
-
-        AnalysisRecord record = AnalysisRecord.submit(memberId);
-        analysisRecordRepository.save(record);
-
-        videoAnalysisAsyncWorker.process(record.getId(), videoBytes, file.getOriginalFilename(), file.getContentType());
         return record.getId();
     }
 

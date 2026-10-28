@@ -1,5 +1,7 @@
 package com.veritae.veritae_server.detection;
 
+import java.nio.file.Path;
+
 /**
  * 영상 얼굴조작(face-swap) 딥페이크 탐지 요청을 추상화하는 포트. 이미지/음성과 별도
  * 인터페이스로 분리한 이유는 docs/superpowers/specs/2026-08-18-audio-ai-detection-design.md §4
@@ -8,5 +10,5 @@ package com.veritae.veritae_server.detection;
  */
 public interface VideoDetectionClient {
 
-    VideoAnalysisResult detectVideo(byte[] videoBytes, String filename, String contentType);
+    VideoAnalysisResult detectVideo(Path videoFile, String filename, String contentType);
 }

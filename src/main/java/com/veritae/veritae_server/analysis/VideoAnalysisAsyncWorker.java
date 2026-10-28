@@ -15,6 +15,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.nio.file.Path;
 import java.util.UUID;
 import java.util.function.Function;
 
@@ -44,7 +45,15 @@ public class VideoAnalysisAsyncWorker {
     private final TransactionTemplate transactionTemplate;
 
     @Async("videoAnalysisExecutor")
-    public void process(UUID jobId, byte[] videoBytes, String filename, String contentType) {
+    public void process(UUID jobId, Path videoFile, String filename, String contentType) {
+        try {
+            processFile(jobId, videoFile, filename, contentType);
+        } finally {
+            VideoUploadFiles.deleteQuietly(videoFile);
+        }
+    }
+
+    private void processFile(UUID jobId, Path videoFile, String filename, String contentType) {
         UUID memberId = update(jobId, record -> {
             record.markProcessing();
             return record.getMemberId();
@@ -56,7 +65,7 @@ public class VideoAnalysisAsyncWorker {
 
         VideoAnalysisResult result;
         try {
-            result = videoDetectionClient.detectVideo(videoBytes, filename, contentType);
+            result = videoDetectionClient.detectVideo(videoFile, filename, contentType);
         } catch (Exception e) {
             // 탐지 서버(Python)가 던지는 원문 에러 메시지에는 내부 경로/traceback 일부가 섞여 나올 수 있어
             // 클라이언트(errorMessage)에 그대로 노출하지 않는다. 상세 원인은 로그에만 남기고,
@@ -69,7 +78,7 @@ public class VideoAnalysisAsyncWorker {
             return;
         }
 
-        String mediaKey = analysisMediaService.uploadOriginal(memberId, jobId, videoBytes, contentType);
+        String mediaKey = analysisMediaService.uploadOriginal(memberId, jobId, videoFile, contentType);
         Boolean saved = update(jobId, record -> {
             complete(record, result);
             if (mediaKey != null) {

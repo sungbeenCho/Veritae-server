@@ -50,6 +50,11 @@ dependencies {
 	implementation platform('software.amazon.awssdk:bom:2.55.6')
 	implementation 'software.amazon.awssdk:s3'
 
+	// 운영(prod 프로필)의 스키마 관리. Boot 4는 JPA 스타터가 Flyway를 끌고 오지 않아 직접 선언하고,
+	// MySQL 지원은 별도 모듈(flyway-mysql)에 있다. 로컬 개발은 spring.flyway.enabled=false(기본)로 끈다.
+	implementation 'org.springframework.boot:spring-boot-starter-flyway'
+	runtimeOnly 'org.flywaydb:flyway-mysql'
+
 	compileOnly 'org.projectlombok:lombok'
 	runtimeOnly 'com.mysql:mysql-connector-j'
 	annotationProcessor 'org.projectlombok:lombok'

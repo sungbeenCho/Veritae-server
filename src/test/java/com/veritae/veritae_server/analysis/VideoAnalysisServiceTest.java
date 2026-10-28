@@ -8,10 +8,14 @@ import com.veritae.veritae_server.domain.analysisrecord.AnalysisJobStatus;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.api.io.TempDir;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.core.task.TaskRejectedException;
 import org.springframework.mock.web.MockMultipartFile;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -19,6 +23,8 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -36,9 +42,13 @@ class VideoAnalysisServiceTest {
 
     private VideoAnalysisService videoAnalysisService;
 
+    @TempDir
+    Path uploadDir;
+
     @BeforeEach
     void setUp() {
-        videoAnalysisService = new VideoAnalysisService(analysisRecordRepository, videoAnalysisAsyncWorker);
+        videoAnalysisService = new VideoAnalysisService(analysisRecordRepository, videoAnalysisAsyncWorker,
+                new VideoUploadFiles(uploadDir));
     }
 
     @Test
@@ -53,7 +63,35 @@ class VideoAnalysisServiceTest {
         // Then
         assertThat(jobId).isNotNull();
         verify(analysisRecordRepository).save(any(AnalysisRecord.class));
-        verify(videoAnalysisAsyncWorker).process(org.mockito.ArgumentMatchers.eq(jobId), any(), org.mockito.ArgumentMatchers.eq("test.mp4"), org.mockito.ArgumentMatchers.eq("video/mp4"));
+        verify(videoAnalysisAsyncWorker).process(eq(jobId), any(), eq("test.mp4"), eq("video/mp4"));
+    }
+
+    @Test
+    void submitVideo_shouldHandVideoToWorkerAsTempFileNotBytes() throws Exception {
+        var file = new MockMultipartFile("file", "test.mp4", "video/mp4", "fake-bytes".getBytes());
+        var handed = new Path[1];
+        org.mockito.Mockito.doAnswer(invocation -> {
+            handed[0] = invocation.getArgument(1);
+            return null;
+        }).when(videoAnalysisAsyncWorker).process(any(), any(), any(), any());
+
+        videoAnalysisService.submitVideo(file, UUID.randomUUID());
+
+        assertThat(handed[0].getParent()).isEqualTo(uploadDir);
+        assertThat(Files.readAllBytes(handed[0])).isEqualTo("fake-bytes".getBytes());
+    }
+
+    @Test
+    void submitVideo_whenQueueRejects_shouldDeleteTempFileAndRethrow() throws Exception {
+        var file = new MockMultipartFile("file", "test.mp4", "video/mp4", "fake-bytes".getBytes());
+        doThrow(new TaskRejectedException("queue full"))
+                .when(videoAnalysisAsyncWorker).process(any(), any(), any(), any());
+
+        assertThatThrownBy(() -> videoAnalysisService.submitVideo(file, UUID.randomUUID()))
+                .isInstanceOf(TaskRejectedException.class);
+        try (var leftovers = Files.list(uploadDir)) {
+            assertThat(leftovers).isEmpty();
+        }
     }
 
     @Test
