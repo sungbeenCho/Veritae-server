@@ -189,10 +189,10 @@ paths:
                       score: 0.97
                       evidenceImage: "iVBORw0KGgoAAAANSUhEUgAA... (base64 PNG, 생략)"
                     scamDetection:
-                      model: lilju
-                      score: 0.82
+                      model: qwen3.5:4b-scam-v3
+                      score: 0.95
                       evidence:
-                        - sentence: 지금 바로 계좌번호와 비밀번호를 알려주셔야 합니다.
+                        - sentence: 금융기관을 사칭해 본인 인증과 이체를 요구하는 사기 글입니다.
                           score: 0.95
                 real_no_text:
                   summary: 실제 사진(AI 아님) + 텍스트가 전혀 없는 경우
@@ -273,10 +273,10 @@ paths:
                           startSec: 0.5
                           endSec: 1.2
                     scamDetection:
-                      model: lilju
-                      score: 0.82
+                      model: qwen3.5:4b-scam-v3
+                      score: 0.95
                       evidence:
-                        - sentence: 지금 바로 계좌번호와 비밀번호를 알려주셔야 합니다.
+                        - sentence: 금융기관을 사칭해 본인 인증과 이체를 요구하는 사기 글입니다.
                           score: 0.95
                 real_no_text:
                   summary: 실제 음성(AI 아님) + 텍스트가 전혀 없는 경우
@@ -436,10 +436,10 @@ paths:
                           endSec: 7.0
                       evidenceImage: "iVBORw0KGgoAAAANSUhEUgAA... (base64 PNG, 생략)"
                     scamDetection:
-                      model: lilju
-                      score: 0.82
+                      model: qwen3.5:4b-scam-v3
+                      score: 0.95
                       evidence:
-                        - sentence: 지금 바로 계좌번호와 비밀번호를 알려주셔야 합니다.
+                        - sentence: 금융기관을 사칭해 본인 인증과 이체를 요구하는 사기 글입니다.
                           score: 0.95
                 completed_no_face:
                   summary: 완료 - 얼굴없음(AI판독 불가), 사기감지는 성공
@@ -447,10 +447,10 @@ paths:
                     jobId: 11111111-1111-1111-1111-111111111111
                     status: COMPLETED
                     scamDetection:
-                      model: lilju
-                      score: 0.82
+                      model: qwen3.5:4b-scam-v3
+                      score: 0.95
                       evidence:
-                        - sentence: 지금 바로 계좌번호와 비밀번호를 알려주셔야 합니다.
+                        - sentence: 금융기관을 사칭해 본인 인증과 이체를 요구하는 사기 글입니다.
                           score: 0.95
                     errorCode: NO_FACE_DETECTED
                     errorMessage: 영상에서 얼굴을 찾을 수 없어 AI판독은 제공되지 않습니다. 얼굴이 잘 보이는 영상이면 판독도 함께 받을 수 있습니다.
@@ -533,10 +533,10 @@ paths:
                               startSec: 1.0
                               endSec: 4.0
                         scamDetection:
-                          model: lilju
-                          score: 0.82
+                          model: qwen3.5:4b-scam-v3
+                          score: 0.95
                           evidence:
-                            - sentence: 지금 바로 계좌번호와 비밀번호를 알려주셔야 합니다.
+                            - sentence: 금융기관을 사칭해 본인 인증과 이체를 요구하는 사기 글입니다.
                               score: 0.95
                 video_record_no_face:
                   summary: 영상 기록 - 얼굴 없음(videoDetection 없음, 사기감지는 있음)
@@ -547,10 +547,10 @@ paths:
                         createdAt: '2026-09-23T08:00:00Z'
                         mediaAvailable: false
                         scamDetection:
-                          model: lilju
-                          score: 0.82
+                          model: qwen3.5:4b-scam-v3
+                          score: 0.95
                           evidence:
-                            - sentence: 지금 바로 계좌번호와 비밀번호를 알려주셔야 합니다.
+                            - sentence: 금융기관을 사칭해 본인 인증과 이체를 요구하는 사기 글입니다.
                               score: 0.95
                         errorCode: NO_FACE_DETECTED
                         errorMessage: 영상에서 얼굴을 찾을 수 없어 AI판독은 제공되지 않습니다. 얼굴이 잘 보이는 영상이면 판독도 함께 받을 수 있습니다.
@@ -1199,20 +1199,20 @@ components:
         model:
           type: string
           nullable: false
-          description: 사기감지에 사용된 모델 이름.
-          example: lilju
+          description: 사기감지에 사용된 모델 이름(로컬 LLM 이름 + 판정 지시문 버전).
+          example: qwen3.5:4b-scam-v3
         score:
           type: number
           format: double
           nullable: false
           minimum: 0
           maximum: 1
-          description: 사기(보이스피싱 등)일 위험도(0~1). 문장별 확률의 최댓값x0.7 + 평균x0.3으로 집계.
-          example: 0.82
+          description: 사기(보이스피싱 등)일 위험도(0~1). 추출된 글 전체를 로컬 LLM이 한 번에 판정한 사기 가능성(0~100)을 100으로 나눈 값. 0.5 이상이면 사기로 본다.
+          example: 0.95
         evidence:
           type: array
           nullable: false
-          description: 위험하다고 판단된 문장 근거 카드 목록(개별 확률 0.5 이상만 포함). 근거가 없으면 빈 배열.
+          description: 판정 근거 카드 목록. LLM의 판단 이유 한 문장이 담긴 카드 1장이며, 사기가 아니라고 본 경우에도 그 이유가 담긴다. 이유가 비어 있으면 빈 배열.
           items:
             $ref: '#/components/schemas/ScamEvidence'
 
@@ -1220,21 +1220,21 @@ components:
       type: object
       required: [sentence, score]
       description: >-
-        사기감지 근거 카드 한 장. 위험 문장 원문과 그 문장의 개별 확률만 담는다 - 유형
-        라벨(예: 기관사칭)은 룰 기반 분류가 필요해 포함하지 않는다.
+        사기감지 근거 카드 한 장. LLM이 쓴 판단 이유 한 문장과 전체 위험도를 담는다.
+        이유 문장은 원문 인용이 아니라 모델이 쓴 설명이라 틀릴 수 있다.
       properties:
         sentence:
           type: string
           nullable: false
-          description: 위험하다고 판단된 문장 원문.
-          example: 지금 바로 계좌번호와 비밀번호를 알려주셔야 합니다.
+          description: LLM의 판단 이유 한 문장(원문 인용 아님).
+          example: 금융기관을 사칭해 본인 인증과 이체를 요구하는 사기 글입니다.
         score:
           type: number
           format: double
           nullable: false
           minimum: 0
           maximum: 1
-          description: 이 문장이 사기(보이스피싱 등)일 확률(0~1).
+          description: 전체 사기 위험도와 같은 값(0~1).
           example: 0.95
 
     MisinformationDetectionResult:
