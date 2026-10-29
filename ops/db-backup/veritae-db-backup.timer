@@ -1,0 +1,10 @@
+[Unit]
+Description=Veritae DB 백업 매일 04:00(KST)
+
+[Timer]
+OnCalendar=*-*-* 04:00:00
+# 그 시각에 서버가 꺼져 있었으면 다음에 켜질 때 바로 한 번 실행한다.
+Persistent=true
+
+[Install]
+WantedBy=timers.target
