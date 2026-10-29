@@ -341,6 +341,21 @@ class AnalysisApiControllerTest {
 
     @Test
     @WithMockUser
+    void analyzeImage_whenDetectionServerIsOff_shouldReturn503WithServerOfflineErrorCode() throws Exception {
+        var file = new MockMultipartFile("file", "test.jpg", "image/jpeg", "fake-bytes".getBytes());
+        when(authenticatedMemberResolver.currentMemberId()).thenReturn(java.util.UUID.randomUUID());
+        when(imageAnalysisService.analyzeImage(any(), any()))
+                .thenThrow(new com.veritae.veritae_server.detection.DetectionServerOfflineException(null));
+
+        mockMvc.perform(multipart("/api/v1/analysis/image").file(file))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.errorCode").value("DETECTION_SERVER_OFFLINE"))
+                .andExpect(jsonPath("$.detail").value(
+                        com.veritae.veritae_server.detection.DetectionServerOfflineException.USER_MESSAGE));
+    }
+
+    @Test
+    @WithMockUser
     void getAnalysisJob_withPendingJob_shouldReturnRetryAfterAndJobsAhead() throws Exception {
         java.util.UUID jobId = java.util.UUID.randomUUID();
         java.util.UUID memberId = java.util.UUID.randomUUID();

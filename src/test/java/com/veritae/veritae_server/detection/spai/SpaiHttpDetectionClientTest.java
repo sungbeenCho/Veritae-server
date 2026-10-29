@@ -1,5 +1,7 @@
 package com.veritae.veritae_server.detection.spai;
 
+import com.veritae.veritae_server.detection.ClosedPort;
+import com.veritae.veritae_server.detection.DetectionServerOfflineException;
 import com.veritae.veritae_server.detection.DetectionServiceException;
 import com.veritae.veritae_server.detection.ImageAnalysisResult;
 import org.junit.jupiter.api.Test;
@@ -137,5 +139,13 @@ class SpaiHttpDetectionClientTest {
 
         assertThatThrownBy(() -> client.detectImage("fake-bytes".getBytes(), "test.jpg", "image/jpeg"))
                 .isInstanceOf(DetectionServiceException.class);
+    }
+
+    @Test
+    void detectImage_whenDetectionServerIsOff_shouldThrowServerOffline() {
+        SpaiHttpDetectionClient client = new SpaiHttpDetectionClient(RestClient.builder().baseUrl(ClosedPort.baseUrl()).build());
+
+        assertThatThrownBy(() -> client.detectImage("fake-bytes".getBytes(), "test.jpg", "image/jpeg"))
+                .isInstanceOf(DetectionServerOfflineException.class);
     }
 }

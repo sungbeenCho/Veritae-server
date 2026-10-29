@@ -569,7 +569,8 @@ pdf.endpoint(
         "200 OK",
         "400 Bad Request (빈 파일/지원하지 않는 형식)",
         "401 Unauthorized",
-        "502 Bad Gateway (탐지 서버 호출 실패)",
+        "502 Bad Gateway (탐지 서버 처리 중 실패)",
+        "503 Service Unavailable (탐지 서버 꺼짐 - DETECTION_SERVER_OFFLINE, 잠시 후 다시 시도 안내)",
         "500 Internal Server Error",
     ],
 )
@@ -635,7 +636,8 @@ pdf.endpoint(
         "200 OK",
         "400 Bad Request (빈 파일/지원하지 않는 형식/25MB 초과 INVALID_AUDIO_FILE, 5분 초과 AUDIO_TOO_LONG)",
         "401 Unauthorized",
-        "502 Bad Gateway (탐지 서버 호출 실패)",
+        "502 Bad Gateway (탐지 서버 처리 중 실패)",
+        "503 Service Unavailable (탐지 서버 꺼짐 - DETECTION_SERVER_OFFLINE, 잠시 후 다시 시도 안내)",
         "500 Internal Server Error",
     ],
 )
@@ -765,7 +767,7 @@ pdf.endpoint(
         "경우별 응답: (1) AI 판독과 사기감지 중 하나라도 처리 중 오류가 나면 성공한 쪽 결과도 함께 버리고 "
         "FAILED + ANALYSIS_FAILED가 된다(결과 필드 둘 다 없음, 같은 영상으로 재시도 가능) - 한쪽 결과만 "
         "담긴 COMPLETED는 오지 않는다. 사기감지가 실패했는데 결과가 비어 있으면 '사기 아님'으로 오해될 수 "
-        "있어서다. (2) 얼굴을 찾지 못하면 COMPLETED + NO_FACE_DETECTED이고 aiDetection이 없다 - "
+        "있어서다. 탐지 서버가 꺼져 있어 분석하지 못하면 FAILED + DETECTION_SERVER_OFFLINE이다(서버가 켜진 뒤 다시 접수). (2) 얼굴을 찾지 못하면 COMPLETED + NO_FACE_DETECTED이고 aiDetection이 없다 - "
         "scamDetection은 얼굴과 무관하게 있을 수 있다. (3) 얼굴도 텍스트도 없으면 COMPLETED + "
         "NO_FACE_DETECTED이고 결과 필드가 둘 다 없다 - 오류가 아니라 '판독할 대상이 없었다'는 정상 결과다. "
         "(4) 얼굴은 있지만 텍스트가 없으면 COMPLETED이고 errorCode 없이 scamDetection만 없다. errorCode 없이 "
@@ -1010,7 +1012,8 @@ pdf.error_table(
         ("404", "MEDIA_NOT_AVAILABLE", "기록은 있지만 원본 파일이 없음"),
         ("409", "EMAIL_ALREADY_EXISTS", "이미 가입된 이메일"),
         ("416", "RANGE_NOT_SATISFIABLE", "원본 다운로드의 Range가 파일 크기를 벗어남"),
-        ("502", "DETECTION_SERVICE_UNAVAILABLE", "탐지 서버(3060Ti 데스크탑) 호출 실패"),
+        ("502", "DETECTION_SERVICE_UNAVAILABLE", "탐지 서버(3060Ti 데스크탑) 처리 중 실패"),
+        ("503", "DETECTION_SERVER_OFFLINE", "탐지 서버가 꺼져 있어 연결 불가 - 잠시 후 다시 시도"),
         ("500", "INTERNAL_SERVER_ERROR", "예기치 못한 서버 오류"),
     ],
     "※ 위 표에 없는 값도 올 수 있다: 명시적으로 처리하지 않은 프레임워크 레벨 오류(예: 지원하지 않는 "
