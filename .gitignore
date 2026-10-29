@@ -39,3 +39,6 @@ out/
 
 ### VS Code ###
 .vscode/
+
+### 로컬 시험용 샘플 (원본은 veritae-detection-server/tests/samples) ###
+test-samples/
