@@ -54,7 +54,7 @@ class VideoAnalysisServiceTest {
     @Test
     void submitVideo_withValidMp4_shouldCreatePendingJobAndTriggerAsyncWorker() throws Exception {
         // Given
-        var file = new MockMultipartFile("file", "test.mp4", "video/mp4", "fake-bytes".getBytes());
+        var file = new MockMultipartFile("file", "test.mp4", "video/mp4", MediaFixtures.MP4);
         UUID memberId = UUID.randomUUID();
 
         // When
@@ -68,7 +68,7 @@ class VideoAnalysisServiceTest {
 
     @Test
     void submitVideo_shouldHandVideoToWorkerAsTempFileNotBytes() throws Exception {
-        var file = new MockMultipartFile("file", "test.mp4", "video/mp4", "fake-bytes".getBytes());
+        var file = new MockMultipartFile("file", "test.mp4", "video/mp4", MediaFixtures.MP4);
         var handed = new Path[1];
         org.mockito.Mockito.doAnswer(invocation -> {
             handed[0] = invocation.getArgument(1);
@@ -78,12 +78,12 @@ class VideoAnalysisServiceTest {
         videoAnalysisService.submitVideo(file, UUID.randomUUID());
 
         assertThat(handed[0].getParent()).isEqualTo(uploadDir);
-        assertThat(Files.readAllBytes(handed[0])).isEqualTo("fake-bytes".getBytes());
+        assertThat(Files.readAllBytes(handed[0])).isEqualTo(MediaFixtures.MP4);
     }
 
     @Test
     void submitVideo_whenQueueRejects_shouldDeleteTempFileAndRethrow() throws Exception {
-        var file = new MockMultipartFile("file", "test.mp4", "video/mp4", "fake-bytes".getBytes());
+        var file = new MockMultipartFile("file", "test.mp4", "video/mp4", MediaFixtures.MP4);
         doThrow(new TaskRejectedException("queue full"))
                 .when(videoAnalysisAsyncWorker).process(any(), any(), any(), any());
 
@@ -240,5 +240,16 @@ class VideoAnalysisServiceTest {
         // When / Then: 요청자가 소유자가 아님
         assertThatThrownBy(() -> videoAnalysisService.getJob(job.getId(), UUID.randomUUID()))
                 .isInstanceOf(AnalysisJobNotFoundException.class);
+    }
+
+    @Test
+    void submitVideo_withNonVideoContentLabeledAsMp4_shouldThrowInvalidVideoFileException() {
+        var file = new MockMultipartFile("file", "test.mp4", "video/mp4", MediaFixtures.NOT_MEDIA);
+        var memberId = java.util.UUID.randomUUID();
+
+        assertThatThrownBy(() -> videoAnalysisService.submitVideo(file, memberId))
+                .isInstanceOf(InvalidVideoFileException.class)
+                .hasMessage("파일 내용이 지원하는 영상 형식(MP4/MOV/AVI)이 아닙니다.");
+        verifyNoInteractions(analysisRecordRepository);
     }
 }

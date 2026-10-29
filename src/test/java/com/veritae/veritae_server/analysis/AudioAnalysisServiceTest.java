@@ -38,7 +38,7 @@ class AudioAnalysisServiceTest {
 
     @Test
     void analyzeAudio_withValidWav_shouldReturnAnalysisResult() throws Exception {
-        var file = new MockMultipartFile("file", "test.wav", "audio/wav", "fake-bytes".getBytes());
+        var file = new MockMultipartFile("file", "test.wav", "audio/wav", MediaFixtures.WAV);
         var memberId = java.util.UUID.randomUUID();
         var expected = new AudioAnalysisResult(new AudioDetectionResult("antideepfake", 0.87, List.of()), null, null);
         when(audioDetectionClient.detectAudio(file.getBytes(), "test.wav", "audio/wav")).thenReturn(expected);
@@ -96,7 +96,7 @@ class AudioAnalysisServiceTest {
 
     @Test
     void analyzeAudio_withValidWav_shouldSaveCompletedAnalysisRecord() throws Exception {
-        var file = new MockMultipartFile("file", "test.wav", "audio/wav", "fake-bytes".getBytes());
+        var file = new MockMultipartFile("file", "test.wav", "audio/wav", MediaFixtures.WAV);
         var memberId = java.util.UUID.randomUUID();
         var expected = new AudioAnalysisResult(new AudioDetectionResult("antideepfake", 0.87, List.of()), null, null);
         when(audioDetectionClient.detectAudio(file.getBytes(), "test.wav", "audio/wav")).thenReturn(expected);
@@ -113,7 +113,7 @@ class AudioAnalysisServiceTest {
 
     @Test
     void analyzeAudio_withMisinformationClaims_shouldSaveMisinfoRefutedCount() throws Exception {
-        var file = new MockMultipartFile("file", "test.wav", "audio/wav", "fake-bytes".getBytes());
+        var file = new MockMultipartFile("file", "test.wav", "audio/wav", MediaFixtures.WAV);
         var memberId = java.util.UUID.randomUUID();
         var wikiEvidence = new com.veritae.veritae_server.detection.WikiEvidence(
                 "선풍기 사망설", "선풍기 사망설이란 미신이다.", "https://ko.wikipedia.org/wiki/선풍기_사망설");
@@ -137,7 +137,7 @@ class AudioAnalysisServiceTest {
 
     @Test
     void analyzeAudio_withValidWav_shouldReturnIdOfSavedRecordAndStoreOriginal() throws Exception {
-        var file = new MockMultipartFile("file", "test.m4a", "audio/mp4", "fake-bytes".getBytes());
+        var file = new MockMultipartFile("file", "test.m4a", "audio/mp4", MediaFixtures.WAV);
         var memberId = java.util.UUID.randomUUID();
         when(audioDetectionClient.detectAudio(file.getBytes(), "test.m4a", "audio/mp4"))
                 .thenReturn(new AudioAnalysisResult(new AudioDetectionResult("antideepfake", 0.87, List.of()), null, null));
@@ -150,12 +150,12 @@ class AudioAnalysisServiceTest {
         assertThat(outcome.recordId()).isEqualTo(captor.getValue().getId());
         String mediaKey = captor.getValue().getMediaKey();
         assertThat(mediaKey).isEqualTo("media/" + memberId + "/" + captor.getValue().getId());
-        assertThat(mediaStorage.objects().get(mediaKey)).isEqualTo("fake-bytes".getBytes());
+        assertThat(mediaStorage.objects().get(mediaKey)).isEqualTo(MediaFixtures.WAV);
     }
 
     @Test
     void analyzeAudio_whenDetectionServerRejectsTooLongAudio_shouldPropagateAndSaveNothing() throws Exception {
-        var file = new MockMultipartFile("file", "long.m4a", "audio/mp4", "fake-bytes".getBytes());
+        var file = new MockMultipartFile("file", "long.m4a", "audio/mp4", MediaFixtures.WAV);
         var memberId = java.util.UUID.randomUUID();
         when(audioDetectionClient.detectAudio(file.getBytes(), "long.m4a", "audio/mp4"))
                 .thenThrow(new com.veritae.veritae_server.detection.AudioTooLongException("음성 길이가 5분을 초과합니다."));
@@ -164,5 +164,17 @@ class AudioAnalysisServiceTest {
                 .isInstanceOf(com.veritae.veritae_server.detection.AudioTooLongException.class);
         verifyNoInteractions(analysisRecordRepository);
         assertThat(mediaStorage.objects()).isEmpty();
+    }
+
+    @Test
+    void analyzeAudio_withNonAudioContentLabeledAsWav_shouldThrowInvalidAudioFileException() {
+        var file = new MockMultipartFile("file", "test.wav", "audio/wav", MediaFixtures.NOT_MEDIA);
+        var memberId = java.util.UUID.randomUUID();
+
+        assertThatThrownBy(() -> audioAnalysisService.analyzeAudio(file, memberId))
+                .isInstanceOf(InvalidAudioFileException.class)
+                .hasMessage("파일 내용이 지원하는 음성 형식(WAV/MP3/M4A/AAC)이 아닙니다.");
+        verifyNoInteractions(audioDetectionClient);
+        verifyNoInteractions(analysisRecordRepository);
     }
 }

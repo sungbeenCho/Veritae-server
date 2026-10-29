@@ -87,7 +87,7 @@ class EndToEndScenarioTest {
     @Test
     void image_analysisThenListThenDownloadWholeAndPartialOriginal() throws Exception {
         String token = signupAndLogin();
-        byte[] original = "IMAGE-BYTES-0123456789".getBytes(StandardCharsets.UTF_8); // 22바이트
+        byte[] original = jpeg("IMAGE-BYTES-0123456".getBytes(StandardCharsets.UTF_8)); // JPEG 머리 3바이트 + 19바이트 = 22바이트
 
         HttpResponse<String> analyzed = upload("/api/v1/analysis/image", token, "photo.jpg", "image/jpeg", original);
         assertThat(analyzed.statusCode()).isEqualTo(200);
@@ -120,7 +120,7 @@ class EndToEndScenarioTest {
     void media_ofAnotherMembersRecord_shouldBe404WithoutRevealingIt() throws Exception {
         String owner = signupAndLogin();
         String other = signupAndLogin();
-        String recordId = json(upload("/api/v1/analysis/image", owner, "a.jpg", "image/jpeg", new byte[]{1, 2, 3}))
+        String recordId = json(upload("/api/v1/analysis/image", owner, "a.jpg", "image/jpeg", jpeg(new byte[]{1, 2, 3})))
                 .path("id").asText();
 
         HttpResponse<byte[]> response = getBytes("/api/v1/analysis/records/" + recordId + "/media", other, null);
@@ -142,7 +142,7 @@ class EndToEndScenarioTest {
         String memberId = json(get("/api/v1/members/me", token)).path("id").asText();
         String oldestId = null;
         for (int i = 0; i < 11; i++) {
-            String id = json(upload("/api/v1/analysis/image", token, "p" + i + ".jpg", "image/jpeg", new byte[]{(byte) i}))
+            String id = json(upload("/api/v1/analysis/image", token, "p" + i + ".jpg", "image/jpeg", jpeg(new byte[]{(byte) i})))
                     .path("id").asText();
             if (i == 0) {
                 oldestId = id;
@@ -164,12 +164,12 @@ class EndToEndScenarioTest {
     void audio_overFiveMinutesIsRejectedAndNormalAudioReturnsId() throws Exception {
         String token = signupAndLogin();
 
-        HttpResponse<String> tooLong = upload("/api/v1/analysis/audio", token, "long.m4a", "audio/mp4", new byte[]{1});
+        HttpResponse<String> tooLong = upload("/api/v1/analysis/audio", token, "long.m4a", "audio/mp4", m4a(new byte[]{1}));
         assertThat(tooLong.statusCode()).isEqualTo(400);
         assertThat(json(tooLong).path("errorCode").asText()).isEqualTo("AUDIO_TOO_LONG");
         assertThat(json(tooLong).path("detail").asText()).isEqualTo("음성 길이가 5분을 초과합니다.");
 
-        HttpResponse<String> ok = upload("/api/v1/analysis/audio", token, "call.m4a", "audio/mp4", new byte[]{1, 2});
+        HttpResponse<String> ok = upload("/api/v1/analysis/audio", token, "call.m4a", "audio/mp4", m4a(new byte[]{1, 2}));
         assertThat(ok.statusCode()).isEqualTo(200);
         assertThat(json(ok).path("id").asText()).isNotBlank();
         // 5분 초과로 거부된 음성은 기록이 남지 않는다.
@@ -179,7 +179,7 @@ class EndToEndScenarioTest {
     @Test
     void video_pollingShowsRetryAfterThenCompletesWithOriginalAndErrorMessage() throws Exception {
         String token = signupAndLogin();
-        byte[] video = "VIDEO-BYTES".getBytes(StandardCharsets.UTF_8);
+        byte[] video = mp4("VIDEO-BYTES".getBytes(StandardCharsets.UTF_8));
 
         HttpResponse<String> accepted = upload("/api/v1/analysis/video", token, "clip.mp4", "video/mp4", video);
         assertThat(accepted.statusCode()).isEqualTo(202);
@@ -213,7 +213,7 @@ class EndToEndScenarioTest {
         String token = signupAndLogin();
         String[] jobs = new String[4];
         for (int i = 0; i < jobs.length; i++) {
-            jobs[i] = json(upload("/api/v1/analysis/video", token, "v" + i + ".mp4", "video/mp4", new byte[]{(byte) i}))
+            jobs[i] = json(upload("/api/v1/analysis/video", token, "v" + i + ".mp4", "video/mp4", mp4(new byte[]{(byte) i})))
                     .path("jobId").asText();
             Thread.sleep(5);
         }
@@ -235,7 +235,7 @@ class EndToEndScenarioTest {
     @Test
     void jobs_withImageRecordId_shouldBe404() throws Exception {
         String token = signupAndLogin();
-        String imageId = json(upload("/api/v1/analysis/image", token, "a.jpg", "image/jpeg", new byte[]{1}))
+        String imageId = json(upload("/api/v1/analysis/image", token, "a.jpg", "image/jpeg", jpeg(new byte[]{1})))
                 .path("id").asText();
 
         HttpResponse<String> response = get("/api/v1/analysis/jobs/" + imageId, token);
@@ -249,7 +249,7 @@ class EndToEndScenarioTest {
         String email = "e2e-" + UUID.randomUUID().toString().substring(0, 8) + "@veritae.app";
         String token = signupAndLogin(email);
         String memberId = json(get("/api/v1/members/me", token)).path("id").asText();
-        upload("/api/v1/analysis/image", token, "a.jpg", "image/jpeg", new byte[]{1});
+        upload("/api/v1/analysis/image", token, "a.jpg", "image/jpeg", jpeg(new byte[]{1}));
         assertThat(storage.objects().keySet()).anyMatch(k -> k.startsWith("media/" + memberId + "/"));
 
         HttpResponse<String> wrong = postJson("/api/v1/members/me/withdrawal", token, "{\"password\":\"wrong1234\"}");
@@ -462,5 +462,27 @@ class EndToEndScenarioTest {
         public synchronized void deleteByPrefix(String prefix) {
             super.deleteByPrefix(prefix);
         }
+    }
+
+    // 서버가 업로드 내용의 형식 표시(MediaSignatures)를 확인하므로, 시험 내용 앞에 실제 형식의 머리를 붙인다.
+    private static final byte[] JPEG_HEAD = {(byte) 0xFF, (byte) 0xD8, (byte) 0xFF};
+    private static final byte[] ISO_BMFF_HEAD = {0, 0, 0, 0x20, 'f', 't', 'y', 'p', 'i', 's', 'o', 'm'};
+
+    private static byte[] jpeg(byte[] tail) {
+        return concat(JPEG_HEAD, tail);
+    }
+
+    private static byte[] m4a(byte[] tail) {
+        return concat(ISO_BMFF_HEAD, tail);
+    }
+
+    private static byte[] mp4(byte[] tail) {
+        return concat(ISO_BMFF_HEAD, tail);
+    }
+
+    private static byte[] concat(byte[] head, byte[] tail) {
+        byte[] result = Arrays.copyOf(head, head.length + tail.length);
+        System.arraycopy(tail, 0, result, head.length, tail.length);
+        return result;
     }
 }

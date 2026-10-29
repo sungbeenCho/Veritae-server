@@ -36,7 +36,7 @@ class ImageAnalysisServiceTest {
 
     @Test
     void analyzeImage_withValidJpeg_shouldReturnAnalysisResult() throws Exception {
-        var file = new MockMultipartFile("file", "test.jpg", "image/jpeg", "fake-bytes".getBytes());
+        var file = new MockMultipartFile("file", "test.jpg", "image/jpeg", MediaFixtures.JPEG);
         var memberId = java.util.UUID.randomUUID();
         var expected = new ImageAnalysisResult(new ImageDetectionResult("spai", 0.87, null), null, null);
         when(detectionClient.detectImage(file.getBytes(), "test.jpg", "image/jpeg")).thenReturn(expected);
@@ -71,7 +71,7 @@ class ImageAnalysisServiceTest {
 
     @Test
     void analyzeImage_withValidJpeg_shouldSaveCompletedAnalysisRecord() throws Exception {
-        var file = new MockMultipartFile("file", "test.jpg", "image/jpeg", "fake-bytes".getBytes());
+        var file = new MockMultipartFile("file", "test.jpg", "image/jpeg", MediaFixtures.JPEG);
         var memberId = java.util.UUID.randomUUID();
         var expected = new ImageAnalysisResult(new ImageDetectionResult("spai", 0.87, null), null, null);
         when(detectionClient.detectImage(file.getBytes(), "test.jpg", "image/jpeg")).thenReturn(expected);
@@ -88,7 +88,7 @@ class ImageAnalysisServiceTest {
 
     @Test
     void analyzeImage_withMisinformationClaims_shouldSaveMisinfoRefutedCount() throws Exception {
-        var file = new MockMultipartFile("file", "test.jpg", "image/jpeg", "fake-bytes".getBytes());
+        var file = new MockMultipartFile("file", "test.jpg", "image/jpeg", MediaFixtures.JPEG);
         var memberId = java.util.UUID.randomUUID();
         var wikiEvidence = new com.veritae.veritae_server.detection.WikiEvidence(
                 "선풍기 사망설", "선풍기 사망설이란 미신이다.", "https://ko.wikipedia.org/wiki/선풍기_사망설");
@@ -112,7 +112,7 @@ class ImageAnalysisServiceTest {
 
     @Test
     void analyzeImage_withValidJpeg_shouldReturnIdOfSavedRecord() throws Exception {
-        var file = new MockMultipartFile("file", "test.jpg", "image/jpeg", "fake-bytes".getBytes());
+        var file = new MockMultipartFile("file", "test.jpg", "image/jpeg", MediaFixtures.JPEG);
         var memberId = java.util.UUID.randomUUID();
         when(detectionClient.detectImage(file.getBytes(), "test.jpg", "image/jpeg"))
                 .thenReturn(new ImageAnalysisResult(new ImageDetectionResult("spai", 0.87, null), null, null));
@@ -127,7 +127,7 @@ class ImageAnalysisServiceTest {
 
     @Test
     void analyzeImage_withValidJpeg_shouldStoreOriginalAndAttachItToRecord() throws Exception {
-        var file = new MockMultipartFile("file", "test.jpg", "image/jpeg", "fake-bytes".getBytes());
+        var file = new MockMultipartFile("file", "test.jpg", "image/jpeg", MediaFixtures.JPEG);
         var memberId = java.util.UUID.randomUUID();
         when(detectionClient.detectImage(file.getBytes(), "test.jpg", "image/jpeg"))
                 .thenReturn(new ImageAnalysisResult(new ImageDetectionResult("spai", 0.87, null), null, null));
@@ -139,7 +139,7 @@ class ImageAnalysisServiceTest {
         org.mockito.Mockito.verify(analysisRecordRepository).save(captor.capture());
         String mediaKey = captor.getValue().getMediaKey();
         assertThat(mediaKey).isEqualTo("media/" + memberId + "/" + captor.getValue().getId());
-        assertThat(mediaStorage.objects().get(mediaKey)).isEqualTo("fake-bytes".getBytes());
+        assertThat(mediaStorage.objects().get(mediaKey)).isEqualTo(MediaFixtures.JPEG);
         org.mockito.Mockito.verify(analysisRecordRepository)
                 .findByMemberIdAndMediaKeyIsNotNullOrderByCreatedAtDesc(memberId);
     }
@@ -147,7 +147,7 @@ class ImageAnalysisServiceTest {
     @Test
     void analyzeImage_whenMediaStorageDisabled_shouldStillSaveRecordWithoutMedia() throws Exception {
         mediaStorage.disable();
-        var file = new MockMultipartFile("file", "test.jpg", "image/jpeg", "fake-bytes".getBytes());
+        var file = new MockMultipartFile("file", "test.jpg", "image/jpeg", MediaFixtures.JPEG);
         var memberId = java.util.UUID.randomUUID();
         when(detectionClient.detectImage(file.getBytes(), "test.jpg", "image/jpeg"))
                 .thenReturn(new ImageAnalysisResult(new ImageDetectionResult("spai", 0.87, null), null, null));
@@ -158,5 +158,18 @@ class ImageAnalysisServiceTest {
                 com.veritae.veritae_server.domain.analysisrecord.AnalysisRecord.class);
         org.mockito.Mockito.verify(analysisRecordRepository).save(captor.capture());
         assertThat(captor.getValue().getMediaKey()).isNull();
+    }
+
+    @Test
+    void analyzeImage_withNonImageContentLabeledAsJpeg_shouldThrowInvalidImageFileException() {
+        // 꼬리표(Content-Type)는 보내는 쪽이 마음대로 붙일 수 있다 - 내용이 이미지가 아니면 탐지 서버로 보내지 않는다.
+        var file = new MockMultipartFile("file", "test.jpg", "image/jpeg", MediaFixtures.NOT_MEDIA);
+        var memberId = java.util.UUID.randomUUID();
+
+        assertThatThrownBy(() -> imageAnalysisService.analyzeImage(file, memberId))
+                .isInstanceOf(InvalidImageFileException.class)
+                .hasMessage("파일 내용이 지원하는 이미지 형식(JPEG/PNG/WebP)이 아닙니다.");
+        verifyNoInteractions(detectionClient);
+        verifyNoInteractions(analysisRecordRepository);
     }
 }

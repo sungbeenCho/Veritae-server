@@ -571,7 +571,7 @@ pdf.endpoint(
     ),
     status_codes=[
         "200 OK",
-        "400 Bad Request (빈 파일/지원하지 않는 형식)",
+        "400 Bad Request (빈 파일/지원하지 않는 형식 - 파일 내용이 JPEG·PNG·WebP가 아니면 Content-Type이 맞아도 거부)",
         "401 Unauthorized",
         "502 Bad Gateway (탐지 서버 처리 중 실패)",
         "503 Service Unavailable (탐지 서버 꺼짐 - DETECTION_SERVER_OFFLINE, 잠시 후 다시 시도 안내)",
@@ -639,7 +639,7 @@ pdf.endpoint(
     ),
     status_codes=[
         "200 OK",
-        "400 Bad Request (빈 파일/지원하지 않는 형식/25MB 초과 INVALID_AUDIO_FILE, 5분 초과 AUDIO_TOO_LONG)",
+        "400 Bad Request (빈 파일/지원하지 않는 형식(내용까지 확인)/25MB 초과 INVALID_AUDIO_FILE, 5분 초과 AUDIO_TOO_LONG)",
         "401 Unauthorized",
         "502 Bad Gateway (탐지 서버 처리 중 실패)",
         "503 Service Unavailable (탐지 서버 꺼짐 - DETECTION_SERVER_OFFLINE, 잠시 후 다시 시도 안내)",
@@ -663,7 +663,7 @@ pdf.endpoint(
     ],
     status_codes=[
         "202 Accepted",
-        "400 Bad Request (빈 파일/지원하지 않는 형식/100MB 초과)",
+        "400 Bad Request (빈 파일/지원하지 않는 형식(내용까지 확인)/100MB 초과)",
         "401 Unauthorized",
         "429 Too Many Requests (분석 합산 회원당 1시간 60번 초과, Retry-After 헤더)",
         "500 Internal Server Error",
