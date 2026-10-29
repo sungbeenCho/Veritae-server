@@ -18,7 +18,7 @@ import org.springframework.web.client.RestClientException;
 /**
  * {@link DetectionClient} 의 SPAI(셀프호스팅) 구현체. 탐지 서버(veritae-detection-server,
  * 3060Ti 데스크탑)의 POST /process/image 를 호출한다. 이미지 판독(SPAI)과 사기감지
- * (Lilju)를 데스크탑이 내부적으로 병렬 실행해 한 응답에 ai_detection/scam_detection을
+ * (2026-10-28부터 로컬 LLM)를 데스크탑이 내부적으로 처리해 한 응답에 ai_detection/scam_detection을
  * 같이 담아 보내므로, HTTP 호출은 지금처럼 한 번만 한다(2026-09-13).
  */
 @Component

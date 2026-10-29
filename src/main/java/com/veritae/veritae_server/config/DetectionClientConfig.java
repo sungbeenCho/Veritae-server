@@ -18,6 +18,8 @@ import org.springframework.web.client.RestClient;
 @RequiredArgsConstructor
 public class DetectionClientConfig {
 
+    static final String API_KEY_HEADER = "X-Detection-Key";
+
     private final DetectionProperties detectionProperties;
 
     @Bean
@@ -25,11 +27,7 @@ public class DetectionClientConfig {
         SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
         requestFactory.setConnectTimeout((int) detectionProperties.connectTimeout().toMillis());
         requestFactory.setReadTimeout((int) detectionProperties.readTimeout().toMillis());
-
-        return RestClient.builder()
-                .baseUrl(detectionProperties.serviceUrl())
-                .requestFactory(requestFactory)
-                .build();
+        return baseBuilder().requestFactory(requestFactory).build();
     }
 
     @Bean
@@ -37,10 +35,15 @@ public class DetectionClientConfig {
         SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
         requestFactory.setConnectTimeout((int) detectionProperties.connectTimeout().toMillis());
         requestFactory.setReadTimeout((int) detectionProperties.videoReadTimeout().toMillis());
+        return baseBuilder().requestFactory(requestFactory).build();
+    }
 
-        return RestClient.builder()
-                .baseUrl(detectionProperties.serviceUrl())
-                .requestFactory(requestFactory)
-                .build();
+    RestClient.Builder baseBuilder() {
+        RestClient.Builder builder = RestClient.builder().baseUrl(detectionProperties.serviceUrl());
+        String apiKey = detectionProperties.apiKey();
+        if (apiKey != null && !apiKey.isBlank()) {
+            builder.defaultHeader(API_KEY_HEADER, apiKey);
+        }
+        return builder;
     }
 }

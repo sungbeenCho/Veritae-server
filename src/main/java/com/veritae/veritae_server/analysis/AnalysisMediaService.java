@@ -10,8 +10,10 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.nio.file.Path;
 import java.util.List;
 import java.util.UUID;
+import java.util.function.Consumer;
 
 /**
  * 분석 원본 파일 관리 - 저장, 회원당 최신 10건 보관, 다운로드, 탈퇴 시 삭제.
@@ -36,12 +38,21 @@ public class AnalysisMediaService {
      * 부가 기능이라, 저장 실패 때문에 이미 끝난 분석 결과까지 실패시키지 않는다(원본만 없는 기록이 된다).
      */
     public String uploadOriginal(UUID memberId, UUID recordId, byte[] bytes, String contentType) {
+        return upload(memberId, recordId, key -> mediaStorage.put(key, bytes, contentType));
+    }
+
+    /** 영상처럼 큰 원본은 임시 파일에서 바로 올린다(메모리에 통째로 올리지 않음). */
+    public String uploadOriginal(UUID memberId, UUID recordId, Path file, String contentType) {
+        return upload(memberId, recordId, key -> mediaStorage.put(key, file, contentType));
+    }
+
+    private String upload(UUID memberId, UUID recordId, Consumer<String> put) {
         if (!mediaStorage.enabled()) {
             return null;
         }
         String key = keyOf(memberId, recordId);
         try {
-            mediaStorage.put(key, bytes, contentType);
+            put.accept(key);
             return key;
         } catch (RuntimeException e) {
             log.warn("분석 원본 저장 실패 - 원본 없이 기록만 남깁니다. recordId={}", recordId, e);

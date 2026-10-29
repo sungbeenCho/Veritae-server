@@ -13,11 +13,16 @@ import com.veritae.veritae_server.media.InMemoryMediaStorage;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.api.io.TempDir;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -43,6 +48,17 @@ class VideoAnalysisAsyncWorkerTest {
 
     private VideoAnalysisAsyncWorker worker;
 
+    @TempDir
+    Path tempDir;
+
+    private Path videoFile() {
+        try {
+            return Files.write(tempDir.resolve("video-" + UUID.randomUUID() + ".upload"), "fake-bytes".getBytes());
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
     @BeforeEach
     void setUp() {
         mediaStorage = new InMemoryMediaStorage();
@@ -63,7 +79,7 @@ class VideoAnalysisAsyncWorkerTest {
                         new VideoDetectionResult("dfdc", 0.91, List.of(), "base64png"), null, null, null));
 
         // When
-        worker.process(job.getId(), "fake-bytes".getBytes(), "test.mp4", "video/mp4");
+        worker.process(job.getId(), videoFile(), "test.mp4", "video/mp4");
 
         // Then
         assertThat(job.getStatus()).isEqualTo(AnalysisJobStatus.COMPLETED);
@@ -91,7 +107,7 @@ class VideoAnalysisAsyncWorkerTest {
                         new VideoDetectionResult("dfdc", 0.91, List.of(), null), null, misinformation, null));
 
         // When
-        worker.process(job.getId(), "fake-bytes".getBytes(), "test.mp4", "video/mp4");
+        worker.process(job.getId(), videoFile(), "test.mp4", "video/mp4");
 
         // Then
         assertThat(job.getMisinfoRefutedCount()).isEqualTo(2);
@@ -108,7 +124,7 @@ class VideoAnalysisAsyncWorkerTest {
                         new VideoDetectionResult("dfdc", 0.91, List.of(), null), null, null, null));
 
         // When
-        worker.process(job.getId(), "fake-bytes".getBytes(), "test.mp4", "video/mp4");
+        worker.process(job.getId(), videoFile(), "test.mp4", "video/mp4");
 
         // Then
         assertThat(job.getMediaKey()).isEqualTo("media/" + memberId + "/" + job.getId());
@@ -125,7 +141,7 @@ class VideoAnalysisAsyncWorkerTest {
                 .thenThrow(new DetectionServiceException("탐지 서버 호출에 실패했습니다.", null));
 
         // When
-        worker.process(job.getId(), "fake-bytes".getBytes(), "test.mp4", "video/mp4");
+        worker.process(job.getId(), videoFile(), "test.mp4", "video/mp4");
 
         // Then: errorMessage는 탐지 서버의 원문 에러(내부 경로/traceback 가능성)를 그대로 노출하지 않고
         // 일반화된 메시지로 저장되어야 한다. 실패한 분석은 기록 목록에 안 나오므로 원본도 보관하지 않는다.
@@ -146,7 +162,7 @@ class VideoAnalysisAsyncWorkerTest {
                 .thenReturn(new VideoAnalysisResult(null, null, null, "NO_FACE_DETECTED"));
 
         // When
-        worker.process(job.getId(), "fake-bytes".getBytes(), "test.mp4", "video/mp4");
+        worker.process(job.getId(), videoFile(), "test.mp4", "video/mp4");
 
         // Then
         assertThat(job.getStatus()).isEqualTo(AnalysisJobStatus.COMPLETED);
@@ -167,7 +183,7 @@ class VideoAnalysisAsyncWorkerTest {
                 .thenReturn(new VideoAnalysisResult(null, scamDetection, null, "NO_FACE_DETECTED"));
 
         // When
-        worker.process(job.getId(), "fake-bytes".getBytes(), "test.mp4", "video/mp4");
+        worker.process(job.getId(), videoFile(), "test.mp4", "video/mp4");
 
         // Then
         assertThat(job.getStatus()).isEqualTo(AnalysisJobStatus.COMPLETED);
@@ -184,7 +200,7 @@ class VideoAnalysisAsyncWorkerTest {
         when(analysisRecordRepository.findById(jobId)).thenReturn(Optional.empty());
 
         // When
-        worker.process(jobId, "fake-bytes".getBytes(), "test.mp4", "video/mp4");
+        worker.process(jobId, videoFile(), "test.mp4", "video/mp4");
 
         // Then
         verifyNoInteractions(videoDetectionClient);
@@ -206,7 +222,7 @@ class VideoAnalysisAsyncWorkerTest {
         when(analysisRecordRepository.findById(job.getId())).thenReturn(Optional.of(job));
 
         // When
-        worker.process(job.getId(), "fake-bytes".getBytes(), "test.mp4", "video/mp4");
+        worker.process(job.getId(), videoFile(), "test.mp4", "video/mp4");
 
         // Then
         verifyNoInteractions(videoDetectionClient);
@@ -226,11 +242,40 @@ class VideoAnalysisAsyncWorkerTest {
                         new VideoDetectionResult("dfdc", 0.91, List.of(), null), null, null, null));
 
         // When
-        worker.process(job.getId(), "fake-bytes".getBytes(), "test.mp4", "video/mp4");
+        worker.process(job.getId(), videoFile(), "test.mp4", "video/mp4");
 
         // Then
         verify(analysisRecordRepository, never()).save(any());
         assertThat(mediaStorage.objects()).isEmpty();
         verify(analysisRecordRepository, never()).findByMemberIdAndMediaKeyIsNotNullOrderByCreatedAtDesc(any());
+    }
+
+    @Test
+    void process_shouldDeleteTempFileAfterSuccessfulDetection() {
+        AnalysisRecord job = AnalysisRecord.submit(UUID.randomUUID());
+        when(analysisRecordRepository.findById(job.getId())).thenReturn(Optional.of(job));
+        when(videoDetectionClient.detectVideo(any(), any(), any()))
+                .thenReturn(new VideoAnalysisResult(
+                        new VideoDetectionResult("dfdc", 0.91, List.of(), null), null, null, null));
+        Path video = videoFile();
+
+        worker.process(job.getId(), video, "test.mp4", "video/mp4");
+
+        assertThat(job.getStatus()).isEqualTo(AnalysisJobStatus.COMPLETED);
+        assertThat(video).doesNotExist();
+    }
+
+    @Test
+    void process_shouldDeleteTempFileEvenWhenDetectionFails() {
+        AnalysisRecord job = AnalysisRecord.submit(UUID.randomUUID());
+        when(analysisRecordRepository.findById(job.getId())).thenReturn(Optional.of(job));
+        when(videoDetectionClient.detectVideo(any(), any(), any()))
+                .thenThrow(new DetectionServiceException("boom", null));
+        Path video = videoFile();
+
+        worker.process(job.getId(), video, "test.mp4", "video/mp4");
+
+        assertThat(job.getStatus()).isEqualTo(AnalysisJobStatus.FAILED);
+        assertThat(video).doesNotExist();
     }
 }

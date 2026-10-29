@@ -39,6 +39,14 @@ CODEBG = (243, 237, 230)
 
 HANGUL_RE = re.compile(r'[\uac00-\ud7a3]+|[^\uac00-\ud7a3]+')
 
+# 이미지/음성 분석 설명에 공통으로 붙는 가짜정보 표시 요건(openapi.yaml MisinformationDetectionResult와 동일).
+MISINFO_DISPLAY_NOTE = (
+    "claims의 evidence는 주장과 모순되는 위키백과 문장 하나(text)와 그 문서 링크(url)이며 항상 1개 이상이다. "
+    "출처 표시(\"출처: 위키백과\"와 url)가 필요하다. "
+    "화면에는 \"이 기능은 위키백과와 명백히 어긋나는 주장만 찾아 보여줍니다. 표시되지 않은 문장은 참일 수도, "
+    "위키백과에 없는 내용이라 확인이 안 됐을 수도 있습니다\" 같은 안내 문구를 함께 보여줘야 한다."
+)
+
 LINE_BODY = 13.3
 LINE_CODE = 14.75
 
@@ -377,6 +385,12 @@ pdf = Spec()
 
 # ---- Title & auth ----
 pdf.doc_title("API 명세서")
+pdf.intro_block("서버 주소", [
+    "운영: https://veritae.duckdns.org (HTTPS만 사용, http로 접속하면 https로 이동)",
+    "로컬 개발: http://localhost:8080",
+    "업로드 최대 크기: 110MB",
+    "이미지·음성 분석은 응답까지 최대 약 2분 30초가 걸린다 - 클라이언트 요청 대기 시간(timeout)을 300초 이상으로 설정해야 한다(기본 60초면 응답 전에 끊김)",
+])
 pdf.intro_block("인증 방식", [
     "JWT (Bearer 토큰)",
     "보호된 API는 요청 헤더에 Authorization: Bearer <accessToken> 필요",
@@ -505,7 +519,7 @@ pdf.endpoint(
 pdf.endpoint(
     6, "이미지 분석 (AI 생성 여부 + 사기 위험도)", "POST", "/api/v1/analysis/image",
     "업로드한 이미지가 AI로 생성되었을 확률과 사기(보이스피싱 등) 위험도를 함께 반환. 탐지 서버 호출이 "
-    "끝날 때까지 응답을 기다리는 동기 방식(수 초~수십 초 소요 가능)",
+    "끝날 때까지 응답을 기다리는 동기 방식(약 2분, 최대 약 2분 30초 소요 - 요청 대기 시간 300초 이상 필요)",
     req_body=["MULTIPART", "file: 분석할 이미지 파일(jpeg/png/webp)"],
     resp_lines=[
         ("AI 생성 이미지로 판별 + 사기 위험 텍스트도 있는 경우", [
@@ -517,11 +531,11 @@ pdf.endpoint(
             '    "evidenceImage": "iVBORw0KGgoAAAANSUhEUgAA... (base64 PNG, 생략)"',
             "  },",
             '  "scamDetection": {',
-            '    "model": "lilju",',
-            '    "score": 0.82,',
+            '    "model": "qwen3.5:4b-scam-v3",',
+            '    "score": 0.95,',
             '    "evidence": [',
             "      {",
-            '        "sentence": "지금 바로 계좌번호와 비밀번호를 알려주셔야 합니다.",',
+            '        "sentence": "금융기관을 사칭해 본인 인증과 이체를 요구하는 사기 글입니다.",',
             '        "score": 0.95',
             "      }",
             "    ]",
@@ -543,10 +557,13 @@ pdf.endpoint(
         "evidenceImage). evidenceImage: 판독 근거 히트맵(base64 PNG). 이미지의 어느 부분이 의심스러운지 "
         "시각적으로 보여준다(best-effort - 실패하면 필드 자체가 빠짐). scamDetection: 이미지에서 텍스트가 "
         "추출되면 그 내용의 사기 위험도(model/score/evidence)를 채워 반환하고, 텍스트가 전혀 없으면 필드가 "
-        "빠진다 - 이 필드가 없으면 항상 '텍스트가 없었다'는 뜻이며, 사기감지 파이프라인 자체가 실패한 경우는 "
+        "빠진다(2026-10-28부터 로컬 LLM이 글 전체를 한 번에 판정 - score는 0~1 사기 위험도로 0.5 이상이면 사기, "
+        "evidence는 LLM의 판단 이유 한 문장이 담긴 카드 1장이며 원문 인용이 아니다. 사기가 아니라고 본 경우에도 "
+        "그 이유가 담기고, evidence[].score는 전체 score와 같다. 음성·영상도 같다) - 이 필드가 없으면 항상 '텍스트가 없었다'는 뜻이며, 사기감지 파이프라인 자체가 실패한 경우는 "
         "조용히 넘어가지 않고 502로 요청 전체가 실패한다(2026-09-22 정책). misinformationDetection: 텍스트가 "
         "추출되면 위키백과와 대조해 거짓으로 판정된 문장만 채워 반환하고(claims 빈 배열이면 반박 근거를 못 "
-        "찾았다는 뜻), 텍스트가 전혀 없으면 필드가 빠진다 - scamDetection과 동일한 원칙(파이프라인 실패 시 502)."
+        "찾았다는 뜻), 텍스트가 전혀 없으면 필드가 빠진다 - scamDetection과 동일한 원칙(파이프라인 실패 시 502). "
+        + MISINFO_DISPLAY_NOTE
     ),
     status_codes=[
         "200 OK",
@@ -561,7 +578,7 @@ pdf.endpoint(
 pdf.endpoint(
     7, "음성 분석 (AI 합성 여부 + 사기 위험도)", "POST", "/api/v1/analysis/audio",
     "업로드한 음성이 AI로 생성(합성)되었을 확률/판독 근거(시간 구간)와 사기(보이스피싱 등) 위험도를 "
-    "함께 반환. 동기 방식. 재생 길이가 5분을 넘으면 분석하지 않고 400(AUDIO_TOO_LONG)으로 거부한다 - "
+    "함께 반환. 동기 방식(약 2분, 최대 약 2분 30초 소요 - 요청 대기 시간 300초 이상 필요). 재생 길이가 5분을 넘으면 분석하지 않고 400(AUDIO_TOO_LONG)으로 거부한다 - "
     "앞부분만 잘라서 분석하지 않는다",
     req_body=["MULTIPART", "file: 분석할 음성 파일(wav/mp3/m4a/aac, 최대 5분/25MB)"],
     resp_lines=[
@@ -582,11 +599,11 @@ pdf.endpoint(
             "    ]",
             "  },",
             '  "scamDetection": {',
-            '    "model": "lilju",',
-            '    "score": 0.82,',
+            '    "model": "qwen3.5:4b-scam-v3",',
+            '    "score": 0.95,',
             '    "evidence": [',
             "      {",
-            '        "sentence": "지금 바로 계좌번호와 비밀번호를 알려주셔야 합니다.",',
+            '        "sentence": "금융기관을 사칭해 본인 인증과 이체를 요구하는 사기 글입니다.",',
             '        "score": 0.95',
             "      }",
             "    ]",
@@ -611,7 +628,8 @@ pdf.endpoint(
         "자체가 실패한 경우는 조용히 넘어가지 않고 502로 요청 전체가 실패한다(2026-09-22 정책). "
         "misinformationDetection: 발화가 추출되면 위키백과와 대조해 거짓으로 판정된 문장만 채워 반환하고 "
         "(claims 빈 배열이면 반박 근거를 못 찾았다는 뜻), 발화가 전혀 없으면 필드가 빠진다 - scamDetection과 "
-        "동일한 원칙(파이프라인 실패 시 502)."
+        "동일한 원칙(파이프라인 실패 시 502). "
+        + MISINFO_DISPLAY_NOTE
     ),
     status_codes=[
         "200 OK",
@@ -684,11 +702,11 @@ pdf.endpoint(
             '    "evidenceImage": "iVBORw0KGgoAAAANSUhEUgAA... (base64 PNG, 생략)"',
             "  },",
             '  "scamDetection": {',
-            '    "model": "lilju",',
-            '    "score": 0.82,',
+            '    "model": "qwen3.5:4b-scam-v3",',
+            '    "score": 0.95,',
             '    "evidence": [',
             "      {",
-            '        "sentence": "지금 바로 계좌번호와 비밀번호를 알려주셔야 합니다.",',
+            '        "sentence": "금융기관을 사칭해 본인 인증과 이체를 요구하는 사기 글입니다.",',
             '        "score": 0.95',
             "      }",
             "    ]",
@@ -700,11 +718,11 @@ pdf.endpoint(
             '  "jobId": "11111111-1111-1111-1111-111111111111",',
             '  "status": "COMPLETED",',
             '  "scamDetection": {',
-            '    "model": "lilju",',
-            '    "score": 0.82,',
+            '    "model": "qwen3.5:4b-scam-v3",',
+            '    "score": 0.95,',
             '    "evidence": [',
             "      {",
-            '        "sentence": "지금 바로 계좌번호와 비밀번호를 알려주셔야 합니다.",',
+            '        "sentence": "금융기관을 사칭해 본인 인증과 이체를 요구하는 사기 글입니다.",',
             '        "score": 0.95',
             "      }",
             "    ]",
@@ -815,11 +833,11 @@ pdf.endpoint(
             "        ]",
             "      },",
             '      "scamDetection": {',
-            '        "model": "lilju",',
-            '        "score": 0.82,',
+            '        "model": "qwen3.5:4b-scam-v3",',
+            '        "score": 0.95,',
             '        "evidence": [',
             "          {",
-            '            "sentence": "지금 바로 계좌번호와 비밀번호를 알려주셔야 합니다.",',
+            '            "sentence": "금융기관을 사칭해 본인 인증과 이체를 요구하는 사기 글입니다.",',
             '            "score": 0.95',
             "          }",
             "        ]",
@@ -837,11 +855,11 @@ pdf.endpoint(
             '      "createdAt": "2026-09-23T08:00:00Z",',
             '      "mediaAvailable": false,',
             '      "scamDetection": {',
-            '        "model": "lilju",',
-            '        "score": 0.82,',
+            '        "model": "qwen3.5:4b-scam-v3",',
+            '        "score": 0.95,',
             '        "evidence": [',
             "          {",
-            '            "sentence": "지금 바로 계좌번호와 비밀번호를 알려주셔야 합니다.",',
+            '            "sentence": "금융기관을 사칭해 본인 인증과 이체를 요구하는 사기 글입니다.",',
             '            "score": 0.95',
             "          }",
             "        ]",

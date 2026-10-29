@@ -54,8 +54,12 @@ class JwtTokenProviderTest {
     void parseAndValidateAccessToken_givenTamperedToken_shouldReturnEmpty() {
         UUID memberId = UUID.randomUUID();
         String accessToken = jwtTokenProvider.generateAccessToken(memberId);
-        String tampered = accessToken.substring(0, accessToken.length() - 1)
-                + (accessToken.charAt(accessToken.length() - 1) == 'a' ? 'b' : 'a');
+        // 서명의 마지막 글자는 base64 패딩 비트 2개가 섞여 있어, 바꿔도 서명 바이트가 그대로일 수 있다
+        // (가끔 통과하던 원인). 6비트가 모두 서명인 첫 글자를 바꾼다.
+        int signatureStart = accessToken.lastIndexOf('.') + 1;
+        char first = accessToken.charAt(signatureStart);
+        String tampered = accessToken.substring(0, signatureStart) + (first == 'a' ? 'b' : 'a')
+                + accessToken.substring(signatureStart + 1);
 
         Optional<UUID> parsed = jwtTokenProvider.parseAndValidateAccessToken(tampered);
 

@@ -9,7 +9,7 @@ import com.veritae.veritae_server.detection.VideoAnalysisResult;
 import com.veritae.veritae_server.detection.VideoDetectionClient;
 import com.veritae.veritae_server.detection.VideoDetectionResult;
 import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.core.io.ByteArrayResource;
+import org.springframework.core.io.FileSystemResource;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.MultipartBodyBuilder;
 import org.springframework.stereotype.Component;
@@ -17,6 +17,7 @@ import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestClientResponseException;
 
+import java.nio.file.Path;
 import java.util.List;
 
 /**
@@ -37,9 +38,10 @@ public class DfdcHttpDetectionClient implements VideoDetectionClient {
     }
 
     @Override
-    public VideoAnalysisResult detectVideo(byte[] videoBytes, String filename, String contentType) {
+    public VideoAnalysisResult detectVideo(Path videoFile, String filename, String contentType) {
         MultipartBodyBuilder builder = new MultipartBodyBuilder();
-        builder.part("file", new ByteArrayResource(videoBytes) {
+        // 파일에서 바로 흘려 보낸다 - 최대 100MB 영상을 메모리에 통째로 올리지 않는다(2026-10-28).
+        builder.part("file", new FileSystemResource(videoFile) {
             @Override
             public String getFilename() {
                 return filename;
