@@ -87,6 +87,9 @@ public class VideoAnalysisService {
         if (file.getSize() > MAX_FILE_SIZE_BYTES) {
             throw new InvalidVideoFileException("파일 용량이 100MB를 초과합니다.");
         }
+        if (!MediaSignatures.looksLikeVideo(MediaSignatures.readHead(file))) {
+            throw new InvalidVideoFileException("파일 내용이 지원하는 영상 형식(MP4/MOV/AVI)이 아닙니다.");
+        }
     }
 
     private VideoAnalysisResult readResultJson(String json) {

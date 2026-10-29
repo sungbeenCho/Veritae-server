@@ -59,6 +59,9 @@ public class AudioAnalysisService {
         if (file.getSize() > MAX_FILE_SIZE_BYTES) {
             throw new InvalidAudioFileException("파일 용량이 25MB를 초과합니다.");
         }
+        if (!MediaSignatures.looksLikeAudio(MediaSignatures.readHead(file))) {
+            throw new InvalidAudioFileException("파일 내용이 지원하는 음성 형식(WAV/MP3/M4A/AAC)이 아닙니다.");
+        }
     }
 
     private String writeResultJson(AudioAnalysisResult result) {

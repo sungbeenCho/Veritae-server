@@ -55,6 +55,9 @@ public class ImageAnalysisService {
         if (!ALLOWED_CONTENT_TYPES.contains(file.getContentType())) {
             throw new InvalidImageFileException("지원하지 않는 파일 형식입니다: " + file.getContentType());
         }
+        if (!MediaSignatures.looksLikeImage(MediaSignatures.readHead(file))) {
+            throw new InvalidImageFileException("파일 내용이 지원하는 이미지 형식(JPEG/PNG/WebP)이 아닙니다.");
+        }
     }
 
     private String writeResultJson(ImageAnalysisResult result) {
