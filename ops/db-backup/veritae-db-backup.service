@@ -1,0 +1,8 @@
+[Unit]
+Description=Veritae DB 백업(mysqldump → 서버 안 + Cloudflare R2)
+After=mysql.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/opt/veritae/bin/veritae-db-backup.sh

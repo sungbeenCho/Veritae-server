@@ -120,6 +120,8 @@ com.veritae.veritae_server
 - 스키마: Flyway(`src/main/resources/db/migration`)가 만들고, Hibernate는 검증(`validate`)만 합니다.
 - 실행: systemd 서비스(전용 계정), `127.0.0.1:8080`에서만 받고 바깥 요청은 Caddy(HTTPS)를 거칩니다.
 - 업로드 상한 110MB, 영상 업로드는 메모리 대신 임시 파일로 처리합니다.
+- 배포는 `scripts/deploy.sh` 한 번으로 하고(실패 시 이전 버전으로 자동 복구), DB는 매일 서버와 Cloudflare R2에 백업합니다.
+  배포·백업·복구 방법은 [`docs/operations.md`](docs/operations.md)에 있습니다.
 
 ## 테스트
 
