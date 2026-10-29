@@ -1,5 +1,6 @@
 package com.veritae.veritae_server.analysis;
 
+import com.veritae.veritae_server.detection.DetectionServerOfflineException;
 import com.veritae.veritae_server.detection.DetectionServiceException;
 import com.veritae.veritae_server.detection.ScamDetectionResult;
 import com.veritae.veritae_server.detection.ScamEvidence;
@@ -150,6 +151,24 @@ class VideoAnalysisAsyncWorkerTest {
         assertThat(job.getErrorMessage()).isEqualTo("영상 분석 중 오류가 발생했습니다.");
         assertThat(job.getMediaKey()).isNull();
         assertThat(mediaStorage.objects()).isEmpty();
+    }
+
+    @Test
+    void process_whenDetectionServerIsOff_shouldMarkJobFailedAsServerOffline() {
+        // Given
+        AnalysisRecord job = AnalysisRecord.submit(UUID.randomUUID());
+        when(analysisRecordRepository.findById(job.getId())).thenReturn(Optional.of(job));
+        when(videoDetectionClient.detectVideo(any(), any(), any()))
+                .thenThrow(new DetectionServerOfflineException(null));
+
+        // When
+        worker.process(job.getId(), videoFile(), "test.mp4", "video/mp4");
+
+        // Then: 앱이 "처리 중 오류"와 구분해 "분석 서버 꺼짐"을 보여줄 수 있어야 한다.
+        assertThat(job.getStatus()).isEqualTo(AnalysisJobStatus.FAILED);
+        assertThat(job.getErrorCode()).isEqualTo("DETECTION_SERVER_OFFLINE");
+        assertThat(job.getErrorMessage()).isEqualTo(DetectionServerOfflineException.USER_MESSAGE);
+        assertThat(job.getMediaKey()).isNull();
     }
 
     @Test

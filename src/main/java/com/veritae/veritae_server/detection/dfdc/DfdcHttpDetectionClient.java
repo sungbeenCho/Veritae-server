@@ -1,6 +1,7 @@
 package com.veritae.veritae_server.detection.dfdc;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.veritae.veritae_server.detection.DetectionCallFailures;
 import com.veritae.veritae_server.detection.DetectionServiceException;
 import com.veritae.veritae_server.detection.Evidence;
 import com.veritae.veritae_server.detection.MisinformationDetectionJson;
@@ -15,7 +16,6 @@ import org.springframework.http.client.MultipartBodyBuilder;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
-import org.springframework.web.client.RestClientResponseException;
 
 import java.nio.file.Path;
 import java.util.List;
@@ -78,10 +78,8 @@ public class DfdcHttpDetectionClient implements VideoDetectionClient {
                     ScamDetectionJson.toScamDetection(response.scamDetection()),
                     MisinformationDetectionJson.toMisinformationDetection(response.misinformationDetection()),
                     response.errorCode());
-        } catch (RestClientResponseException e) {
-            throw new DetectionServiceException("탐지 서버 호출에 실패했습니다: " + e.getMessage(), e);
         } catch (RestClientException e) {
-            throw new DetectionServiceException("탐지 서버 호출에 실패했습니다: " + e.getMessage(), e);
+            throw DetectionCallFailures.translate(e);
         }
     }
 

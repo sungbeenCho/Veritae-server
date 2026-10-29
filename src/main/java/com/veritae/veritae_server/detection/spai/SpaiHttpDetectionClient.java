@@ -2,6 +2,7 @@ package com.veritae.veritae_server.detection.spai;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.veritae.veritae_server.detection.DetectionClient;
+import com.veritae.veritae_server.detection.DetectionCallFailures;
 import com.veritae.veritae_server.detection.DetectionServiceException;
 import com.veritae.veritae_server.detection.ImageAnalysisResult;
 import com.veritae.veritae_server.detection.ImageDetectionResult;
@@ -57,7 +58,7 @@ public class SpaiHttpDetectionClient implements DetectionClient {
                     ScamDetectionJson.toScamDetection(response.scamDetection()),
                     MisinformationDetectionJson.toMisinformationDetection(response.misinformationDetection()));
         } catch (RestClientException e) {
-            throw new DetectionServiceException("탐지 서버 호출에 실패했습니다: " + e.getMessage(), e);
+            throw DetectionCallFailures.translate(e);
         }
     }
 

@@ -1,5 +1,7 @@
 package com.veritae.veritae_server.detection.dfdc;
 
+import com.veritae.veritae_server.detection.ClosedPort;
+import com.veritae.veritae_server.detection.DetectionServerOfflineException;
 import com.veritae.veritae_server.detection.VideoAnalysisResult;
 import com.veritae.veritae_server.detection.DetectionServiceException;
 import org.junit.jupiter.api.Test;
@@ -238,5 +240,13 @@ class DfdcHttpDetectionClientTest {
         assertThat(result.aiDetection()).isNull();
         assertThat(result.errorCode()).isEqualTo("NO_FACE_DETECTED");
         assertThat(result.scamDetection().score()).isEqualTo(0.82);
+    }
+
+    @Test
+    void detectVideo_whenDetectionServerIsOff_shouldThrowServerOffline() {
+        DfdcHttpDetectionClient client = new DfdcHttpDetectionClient(RestClient.builder().baseUrl(ClosedPort.baseUrl()).build());
+
+        assertThatThrownBy(() -> client.detectVideo(videoFile(), "test.mp4", "video/mp4"))
+                .isInstanceOf(DetectionServerOfflineException.class);
     }
 }

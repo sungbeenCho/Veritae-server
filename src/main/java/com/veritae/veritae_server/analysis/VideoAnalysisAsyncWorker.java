@@ -2,6 +2,7 @@ package com.veritae.veritae_server.analysis;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.veritae.veritae_server.detection.DetectionServerOfflineException;
 import com.veritae.veritae_server.detection.VideoAnalysisResult;
 import com.veritae.veritae_server.detection.VideoDetectionClient;
 import com.veritae.veritae_server.domain.analysisrecord.AnalysisRecord;
@@ -66,6 +67,14 @@ public class VideoAnalysisAsyncWorker {
         VideoAnalysisResult result;
         try {
             result = videoDetectionClient.detectVideo(videoFile, filename, contentType);
+        } catch (DetectionServerOfflineException e) {
+            // 데스크탑 탐지 서버를 필요할 때만 켜는 운영 방식이라 꺼져 있을 수 있다 - 처리 오류와 구분해 알린다.
+            log.warn("영상 분석 실패: 탐지 서버 꺼짐 jobId={}", jobId);
+            update(jobId, record -> {
+                record.markFailed(e.getErrorCode(), DetectionServerOfflineException.USER_MESSAGE);
+                return true;
+            });
+            return;
         } catch (Exception e) {
             // 탐지 서버(Python)가 던지는 원문 에러 메시지에는 내부 경로/traceback 일부가 섞여 나올 수 있어
             // 클라이언트(errorMessage)에 그대로 노출하지 않는다. 상세 원인은 로그에만 남기고,

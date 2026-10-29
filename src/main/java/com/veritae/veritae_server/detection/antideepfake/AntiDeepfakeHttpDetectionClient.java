@@ -7,6 +7,7 @@ import com.veritae.veritae_server.detection.AudioAnalysisResult;
 import com.veritae.veritae_server.detection.AudioDetectionClient;
 import com.veritae.veritae_server.detection.AudioDetectionResult;
 import com.veritae.veritae_server.detection.AudioTooLongException;
+import com.veritae.veritae_server.detection.DetectionCallFailures;
 import com.veritae.veritae_server.detection.DetectionServiceException;
 import com.veritae.veritae_server.detection.Evidence;
 import com.veritae.veritae_server.detection.MisinformationDetectionJson;
@@ -78,7 +79,7 @@ public class AntiDeepfakeHttpDetectionClient implements AudioDetectionClient {
             }
             throw new DetectionServiceException("탐지 서버 호출에 실패했습니다: " + e.getMessage(), e);
         } catch (RestClientException e) {
-            throw new DetectionServiceException("탐지 서버 호출에 실패했습니다: " + e.getMessage(), e);
+            throw DetectionCallFailures.translate(e);
         }
     }
 

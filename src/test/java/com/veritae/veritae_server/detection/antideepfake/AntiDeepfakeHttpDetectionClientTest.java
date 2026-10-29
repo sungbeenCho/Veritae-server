@@ -1,5 +1,7 @@
 package com.veritae.veritae_server.detection.antideepfake;
 
+import com.veritae.veritae_server.detection.ClosedPort;
+import com.veritae.veritae_server.detection.DetectionServerOfflineException;
 import com.veritae.veritae_server.detection.AudioAnalysisResult;
 import com.veritae.veritae_server.detection.AudioTooLongException;
 import com.veritae.veritae_server.detection.DetectionServiceException;
@@ -189,5 +191,13 @@ class AntiDeepfakeHttpDetectionClientTest {
         // When / Then
         assertThatThrownBy(() -> client.detectAudio("fake-bytes".getBytes(), "test.wav", "audio/wav"))
                 .isInstanceOf(DetectionServiceException.class);
+    }
+
+    @Test
+    void detectAudio_whenDetectionServerIsOff_shouldThrowServerOffline() {
+        AntiDeepfakeHttpDetectionClient client = new AntiDeepfakeHttpDetectionClient(RestClient.builder().baseUrl(ClosedPort.baseUrl()).build());
+
+        assertThatThrownBy(() -> client.detectAudio("fake-bytes".getBytes(), "test.wav", "audio/wav"))
+                .isInstanceOf(DetectionServerOfflineException.class);
     }
 }
