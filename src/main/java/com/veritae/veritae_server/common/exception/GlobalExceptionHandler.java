@@ -1,5 +1,6 @@
 package com.veritae.veritae_server.common.exception;
 
+import com.veritae.veritae_server.ratelimit.RateLimitExceededException;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
@@ -28,6 +29,14 @@ import java.time.Instant;
 public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
     private static final String ERROR_BASE_URI = "https://api.veritae.app/errors/";
+
+    /** 횟수 제한은 언제 다시 시도하면 되는지 Retry-After(초, RFC 9110)로도 알려준다. 본문은 다른 도메인 오류와 같다. */
+    @ExceptionHandler(RateLimitExceededException.class)
+    public ResponseEntity<ProblemDetail> handleRateLimitExceeded(RateLimitExceededException ex, HttpServletRequest request) {
+        return ResponseEntity.status(ex.getHttpStatus())
+                .header(HttpHeaders.RETRY_AFTER, String.valueOf(ex.getRetryAfterSeconds()))
+                .body(handleDomainException(ex, request));
+    }
 
     @ExceptionHandler(DomainException.class)
     public ProblemDetail handleDomainException(DomainException ex, HttpServletRequest request) {
