@@ -385,6 +385,12 @@ pdf = Spec()
 
 # ---- Title & auth ----
 pdf.doc_title("API 명세서")
+pdf.intro_block("서버 주소", [
+    "운영: https://veritae.duckdns.org (HTTPS만 사용, http로 접속하면 https로 이동)",
+    "로컬 개발: http://localhost:8080",
+    "업로드 최대 크기: 110MB",
+    "이미지·음성 분석은 응답까지 최대 약 2분 30초가 걸린다 - 클라이언트 요청 대기 시간(timeout)을 300초 이상으로 설정해야 한다(기본 60초면 응답 전에 끊김)",
+])
 pdf.intro_block("인증 방식", [
     "JWT (Bearer 토큰)",
     "보호된 API는 요청 헤더에 Authorization: Bearer <accessToken> 필요",
@@ -513,7 +519,7 @@ pdf.endpoint(
 pdf.endpoint(
     6, "이미지 분석 (AI 생성 여부 + 사기 위험도)", "POST", "/api/v1/analysis/image",
     "업로드한 이미지가 AI로 생성되었을 확률과 사기(보이스피싱 등) 위험도를 함께 반환. 탐지 서버 호출이 "
-    "끝날 때까지 응답을 기다리는 동기 방식(수 초~수십 초 소요 가능)",
+    "끝날 때까지 응답을 기다리는 동기 방식(약 2분, 최대 약 2분 30초 소요 - 요청 대기 시간 300초 이상 필요)",
     req_body=["MULTIPART", "file: 분석할 이미지 파일(jpeg/png/webp)"],
     resp_lines=[
         ("AI 생성 이미지로 판별 + 사기 위험 텍스트도 있는 경우", [
@@ -572,7 +578,7 @@ pdf.endpoint(
 pdf.endpoint(
     7, "음성 분석 (AI 합성 여부 + 사기 위험도)", "POST", "/api/v1/analysis/audio",
     "업로드한 음성이 AI로 생성(합성)되었을 확률/판독 근거(시간 구간)와 사기(보이스피싱 등) 위험도를 "
-    "함께 반환. 동기 방식. 재생 길이가 5분을 넘으면 분석하지 않고 400(AUDIO_TOO_LONG)으로 거부한다 - "
+    "함께 반환. 동기 방식(약 2분, 최대 약 2분 30초 소요 - 요청 대기 시간 300초 이상 필요). 재생 길이가 5분을 넘으면 분석하지 않고 400(AUDIO_TOO_LONG)으로 거부한다 - "
     "앞부분만 잘라서 분석하지 않는다",
     req_body=["MULTIPART", "file: 분석할 음성 파일(wav/mp3/m4a/aac, 최대 5분/25MB)"],
     resp_lines=[
