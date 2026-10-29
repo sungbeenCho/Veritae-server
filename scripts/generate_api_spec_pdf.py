@@ -389,6 +389,7 @@ pdf.intro_block("서버 주소", [
     "운영: https://veritae.duckdns.org (HTTPS만 사용, http로 접속하면 https로 이동)",
     "로컬 개발: http://localhost:8080",
     "업로드 최대 크기: 110MB",
+    "요청 횟수 제한: 로그인 1분 10번·가입 1시간 10번·토큰 갱신 1분 30번(IP마다), 분석 1시간 60번(회원마다, 이미지·음성·영상 합산). 넘으면 429와 Retry-After(초)",
     "이미지·음성 분석은 응답까지 최대 약 2분 30초가 걸린다 - 클라이언트 요청 대기 시간(timeout)을 300초 이상으로 설정해야 한다(기본 60초면 응답 전에 끊김)",
 ])
 pdf.intro_block("인증 방식", [
@@ -419,6 +420,7 @@ pdf.endpoint(
         "201 Created",
         "400 Bad Request (입력값 검증 실패)",
         "409 Conflict (이미 가입된 이메일)",
+        "429 Too Many Requests (같은 IP 1시간 10번 초과, Retry-After 헤더)",
         "500 Internal Server Error",
     ],
 )
@@ -445,6 +447,7 @@ pdf.endpoint(
         "200 OK",
         "400 Bad Request (입력값 검증 실패)",
         "401 Unauthorized (이메일/비밀번호 불일치, 구분하지 않음)",
+        "429 Too Many Requests (같은 IP 1분 10번 초과, Retry-After 헤더)",
         "500 Internal Server Error",
     ],
 )
@@ -469,6 +472,7 @@ pdf.endpoint(
         "200 OK",
         "400 Bad Request (입력값 검증 실패)",
         "401 Unauthorized (refreshToken 무효/만료)",
+        "429 Too Many Requests (같은 IP 1분 30번 초과, Retry-After 헤더)",
         "500 Internal Server Error",
     ],
 )
@@ -571,6 +575,7 @@ pdf.endpoint(
         "401 Unauthorized",
         "502 Bad Gateway (탐지 서버 처리 중 실패)",
         "503 Service Unavailable (탐지 서버 꺼짐 - DETECTION_SERVER_OFFLINE, 잠시 후 다시 시도 안내)",
+        "429 Too Many Requests (분석 합산 회원당 1시간 60번 초과, Retry-After 헤더)",
         "500 Internal Server Error",
     ],
 )
@@ -638,6 +643,7 @@ pdf.endpoint(
         "401 Unauthorized",
         "502 Bad Gateway (탐지 서버 처리 중 실패)",
         "503 Service Unavailable (탐지 서버 꺼짐 - DETECTION_SERVER_OFFLINE, 잠시 후 다시 시도 안내)",
+        "429 Too Many Requests (분석 합산 회원당 1시간 60번 초과, Retry-After 헤더)",
         "500 Internal Server Error",
     ],
 )
@@ -659,6 +665,7 @@ pdf.endpoint(
         "202 Accepted",
         "400 Bad Request (빈 파일/지원하지 않는 형식/100MB 초과)",
         "401 Unauthorized",
+        "429 Too Many Requests (분석 합산 회원당 1시간 60번 초과, Retry-After 헤더)",
         "500 Internal Server Error",
     ],
 )
@@ -1014,6 +1021,7 @@ pdf.error_table(
         ("416", "RANGE_NOT_SATISFIABLE", "원본 다운로드의 Range가 파일 크기를 벗어남"),
         ("502", "DETECTION_SERVICE_UNAVAILABLE", "탐지 서버(3060Ti 데스크탑) 처리 중 실패"),
         ("503", "DETECTION_SERVER_OFFLINE", "탐지 서버가 꺼져 있어 연결 불가 - 잠시 후 다시 시도"),
+        ("429", "TOO_MANY_REQUESTS", "정해진 시간 안의 요청 횟수 초과 - Retry-After(초) 뒤 다시 시도"),
         ("500", "INTERNAL_SERVER_ERROR", "예기치 못한 서버 오류"),
     ],
     "※ 위 표에 없는 값도 올 수 있다: 명시적으로 처리하지 않은 프레임워크 레벨 오류(예: 지원하지 않는 "
